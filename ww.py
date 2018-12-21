@@ -1,10 +1,11 @@
 #! /usr/bin/env python3
 
-import os
-import subprocess
 import json
+import os
+import random
+import subprocess
 
-PORT = 33300
+PORT = 45674
 IP = 0
 
 class Key(object):
@@ -30,10 +31,11 @@ class Key(object):
     
 
 class Host(object):
-    def __init__(self, hostname, address, lo_ip, home = None, key = None):
+    def __init__(self, hostname, address, lo_ip, lo_ns_ip, home = None, key = None):
         self.hostname = hostname
         self.address = address
         self.lo_ip = lo_ip
+        self.lo_ns_ip = lo_ns_ip
 
         if len(hostname) < 1:
             raise Exception("Empty hostname.")
@@ -46,12 +48,12 @@ class Host(object):
         self.add_ns("wgns")
         
         self.add_veth("gw", "gw-vm", "10.233.233.1", "10.233.233.2", "wgns")
-        self.add_iptable("nat", "POSTROUTING", "-o gw-host -j MASQUERADE")
+        self.add_iptable("nat", "POSTROUTING", "-o gw -j MASQUERADE")
         self.add_iptable("nat", "POSTROUTING", "-s 10.233.233.2/32 -j MASQUERADE")
         self.add_route("default", via="10.233.233.1", in_ns=True)
-        self.add_iptable("nat", "POSTROUTING", "-o gw-host ! -d 10.233.233.0/24 -j MASQUERADE", in_ns=True)
+        self.add_iptable("nat", "POSTROUTING", "-o gw-vm ! -d 10.233.233.2/32 -j MASQUERADE", in_ns=True)
 
-        self.add_veth("ww", "ww-vm", lo_ip, "10.233.233.233", "wgns")
+        self.add_veth("ww", "ww-vm", lo_ip, lo_ns_ip, "wgns")
 
         if home:
             self.home = home
@@ -92,6 +94,7 @@ class Host(object):
             self.add_cmd(self.ns_exec + "wg set %s listen-port %d private-key %s peer %s allowed-ips 0.0.0.0/0" % (dev, listen_port, self.private_key_path, right.key.pk))
         else:
             self.add_cmd(self.ns_exec + "wg set %s private-key %s peer %s allowed-ips 0.0.0.0/0 endpoint %s" % (dev, self.private_key_path, right.key.pk, endpoint))
+        self.add_iptable("mangle", "POSTROUTING", "-o %s -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu" % dev, in_ns=True)
         self.add_cmd(self.ns_exec + "ip link set up dev %s" % dev)
 
     def cmds_str(self):
@@ -106,12 +109,22 @@ class Host(object):
             f.write(self.cmds_str())
         os.system("chmod +x %s" % name)
 
+    def add_ipset(self, url, in_ns=False):
+        ns_exec = self.ns_exec if in_ns else ""
+        self.add_cmd("curl -o /tmp/ipset.txt " + url)
+        self.add_cmd(ns_exec + "ipset --restore --exist < /tmp/ipset.txt")
+
     def add_iptable(self, table, chain, rule, in_ns = False):
         ns_exec = self.ns_exec if in_ns else ""
         self.add_cmd(ns_exec + "iptables -t %s -D %s %s | true" % (table, chain, rule))
         self.add_cmd(ns_exec + "iptables -t %s -A %s %s" % (table, chain, rule))
 
     def add_route(self, ip_range, in_ns, via=None, link=None):
+        if type(ip_range) in [tuple, list]:
+            for ip in ip_range:
+                self.add_route(ip, in_ns, via=via, link=link)
+            return
+
         gw = None
 
         if via:
@@ -127,6 +140,7 @@ class Host(object):
             raise Exception("Both via and link are None!")
 
         ns_exec = self.ns_exec if in_ns else ""
+        self.add_cmd(ns_exec + "ip route del %s | true" % ip_range)
         self.add_cmd(ns_exec + "ip route add %s via %s" % (ip_range, gw))
 
 class Link(object):
@@ -136,8 +150,8 @@ class Link(object):
         IP += 4
         left_ip = "10.56.200.%d" % (IP+1)
         right_ip = "10.56.200.%d" % (IP+2)
-        left.connect(right, left_ip, right_ip, listen_port=PORT)
-        right.connect(left, right_ip, left_ip, endpoint=left.address+":"+str(PORT))
+        left.connect(right, left_ip, right_ip, endpoint=right.address+":"+str(PORT))
+        right.connect(left, right_ip, left_ip, listen_port=PORT)
 
         self.left = left
         self.left_ip = left_ip
@@ -151,27 +165,36 @@ if __name__ == "__main__":
     dorm_key = Key(key_path="dorm.key")
     hk_key = Key(key_path="hk.key")
     bj_key = Key(key_path="bj.key")
-    dorm = Host("dorm", "dorm.nossl.cn", "10.56.100.3", home="/home/louchenyao", key=dorm_key)
-    bj = Host("bj", "bj.nossl.cn", "10.56.100.1", home="/home/louchenyao", key=bj_key)
-    hk = Host("hk", "hk.nossl.cn", "10.56.100.2", home="/home/louchenyao", key=hk_key)
+    dorm = Host("dorm", None, "10.56.100.3", "10.56.233.3", home="/home/louchenyao", key=dorm_key)
+    bj = Host("bj", "bj.nossl.cn", "10.56.100.1", "10.56.233.1", home="/home/louchenyao", key=bj_key)
+    hk = Host("hk", "hk.nossl.cn", "10.56.100.2", "10.56.233.2",home="/home/louchenyao", key=hk_key)
 
-    bj_dorm = Link(bj, dorm)
-    bj_hk = Link(bj, hk)
-    hk_dorm = Link(hk, dorm)
+    dorm_bj = Link(dorm, bj)
+    hk_bj = Link(hk, bj)
+    dorm_hk = Link(dorm, hk)
 
-    bj.add_route("10.56.100.0/24", via="10.233.233.233", in_ns=False)
-    #bj.add_route("10.56.40.0/24", via=dorm.lo_ip, in_ns=False)
-    bj.add_route(hk.lo_ip, link=bj_hk, in_ns=True)
-    bj.add_route(dorm.lo_ip, link=bj_dorm, in_ns=True)
+    bj.add_route(["10.56.100.0/24", "10.56.233.0/24", "10.56.40.0/24", "1.1.1.1"], via=bj.lo_ns_ip, in_ns=False)
+    bj.add_route(["39.96.60.177", "47.75.6.103"], via="10.233.233.1", in_ns=True)
+    bj.add_route([hk.lo_ip, hk.lo_ns_ip, "1.1.1.1"], link=hk_bj, in_ns=True)
+    bj.add_route([dorm.lo_ip, dorm.lo_ns_ip], link=dorm_bj, in_ns=True)
+    bj.add_route("10.56.40.0/24", link=dorm_bj, in_ns=True)
 
-    dorm.add_route("10.56.100.0/24", via="10.233.233.233", in_ns=False)
-    dorm.add_route(hk.lo_ip, link=hk_dorm, in_ns=True)
-    dorm.add_route(bj.lo_ip, link=bj_dorm, in_ns=True)
+    dorm.add_route(["10.56.100.0/24", "10.56.233.0/24"], via=dorm.lo_ns_ip, in_ns=False)
+    dorm.add_route(["39.96.60.177", "47.75.6.103"], via="10.233.233.1", in_ns=True)
+    dorm.add_route([hk.lo_ip, hk.lo_ns_ip, "1.1.1.1"], link=dorm_hk, in_ns=True)
+    dorm.add_route([bj.lo_ip, bj.lo_ns_ip], link=dorm_bj, in_ns=True)
+    dorm.add_route("10.56.40.0/24", via=dorm.lo_ip, in_ns=True)
 
-    hk.add_route("10.56.100.0/24", via="10.233.233.233", in_ns=False)
-    #hk.add_route("10.56.40.0/24", via=dorm.lo_ip, in_ns=False)
-    hk.add_route(dorm.lo_ip, link=hk_dorm, in_ns=True)
-    hk.add_route(bj.lo_ip, link=bj_hk, in_ns=True)
+    dorm.add_ipset("https://pppublic.oss-cn-beijing.aliyuncs.com/ipsets.txt", in_ns=True)
+    dorm.add_iptable("mangle", "PREROUTING", "-s 10.56.0.0/16 -m set ! --match-set china_ip dst -m set ! --match-set private_ip dst -j MARK --set-xmark 0x1/0xffffffff", in_ns=True)
+    dorm.add_cmd(dorm.ns_exec + "ip rule add fwmark 0x1 table 100")
+    dorm.add_cmd(dorm.ns_exec + "ip route add default via %s table 100" % dorm_hk.right_ip)
+    #cmd("iptables -t mangle -A POSTROUTING -o wg0 -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu")
+
+    hk.add_route(["10.56.100.0/24", "10.56.233.0/24", "10.56.40.0/24"], via=hk.lo_ns_ip, in_ns=False)
+    hk.add_route([dorm.lo_ip, dorm.lo_ns_ip], link=dorm_hk, in_ns=True)
+    hk.add_route([bj.lo_ip, bj.lo_ns_ip], link=hk_bj, in_ns=True)
+    hk.add_route("10.56.40.0/24", link=dorm_hk, in_ns=True)
 
     dorm.save_cmds_as_bash("dorm.sh")
     bj.save_cmds_as_bash("bj.sh")
