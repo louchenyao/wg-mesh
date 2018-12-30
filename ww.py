@@ -90,9 +90,9 @@ class Host(object):
         self.add_cmd(self.ns_exec + "ip address add dev %s %s/30" % (dev, my_ip))
         if listen_port:
             self.add_iptable("nat", "PREROUTING", "-p udp --dport %d -j DNAT --to-destination 10.233.233.2" % listen_port)
-            self.add_cmd(self.ns_exec + "wg set %s listen-port %d private-key %s peer %s allowed-ips 0.0.0.0/0" % (dev, listen_port, self.private_key_path, right.key.pk))
+            self.add_cmd(self.ns_exec + "wg set %s listen-port %d private-key %s peer %s allowed-ips 0.0.0.0/0 persistent-keepalive 30" % (dev, listen_port, self.private_key_path, right.key.pk))
         else:
-            self.add_cmd(self.ns_exec + "wg set %s private-key %s peer %s allowed-ips 0.0.0.0/0 endpoint %s" % (dev, self.private_key_path, right.key.pk, endpoint))
+            self.add_cmd(self.ns_exec + "wg set %s private-key %s peer %s allowed-ips 0.0.0.0/0 endpoint %s persistent-keepalive 30" % (dev, self.private_key_path, right.key.pk, endpoint))
         self.add_iptable("mangle", "POSTROUTING", "-o %s -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu" % dev, in_ns=True)
         self.add_cmd(self.ns_exec + "ip link set up dev %s" % dev)
 
@@ -104,7 +104,7 @@ class Host(object):
     
     def save_cmds_as_bash(self, name):
         with open(name, "w") as f:
-            f.write("#! /bin/bash\n")
+            f.write("#! /bin/bash\n\nset -e\n\n")
             f.write(self.cmds_str())
         os.system("chmod +x %s" % name)
 
@@ -158,43 +158,4 @@ class Link(object):
         self.right_ip = right_ip
 
 if __name__ == "__main__":
-    # Key().dump("bj.key")
-    # Key().dump("hk.key")
-    # Key().dump("dorm.key")
-    dorm_key = Key(key_path="dorm.key")
-    hk_key = Key(key_path="hk.key")
-    bj_key = Key(key_path="bj.key")
-    dorm = Host("dorm", None, "10.56.100.3", "10.56.233.3", home="/home/louchenyao", key=dorm_key)
-    bj = Host("bj", "bj.nossl.cn", "10.56.100.1", "10.56.233.1", home="/home/louchenyao", key=bj_key)
-    hk = Host("hk", "hk.nossl.cn", "10.56.100.2", "10.56.233.2",home="/home/louchenyao", key=hk_key)
-
-    dorm_bj = Link(dorm, bj)
-    hk_bj = Link(hk, bj)
-    dorm_hk = Link(dorm, hk)
-
-    bj.add_route(["10.56.100.0/24", "10.56.233.0/24", "10.56.40.0/24", "1.1.1.1"], via=bj.lo_ns_ip, in_ns=False)
-    bj.add_route(["39.96.60.177", "47.75.6.103"], via="10.233.233.1", in_ns=True)
-    bj.add_route([hk.lo_ip, hk.lo_ns_ip, "1.1.1.1"], link=hk_bj, in_ns=True)
-    bj.add_route([dorm.lo_ip, dorm.lo_ns_ip], link=dorm_bj, in_ns=True)
-    bj.add_route("10.56.40.0/24", link=dorm_bj, in_ns=True)
-
-    dorm.add_route(["10.56.100.0/24", "10.56.233.0/24"], via=dorm.lo_ns_ip, in_ns=False)
-    dorm.add_route(["39.96.60.177", "47.75.6.103"], via="10.233.233.1", in_ns=True)
-    dorm.add_route([hk.lo_ip, hk.lo_ns_ip, "1.1.1.1"], link=dorm_hk, in_ns=True)
-    dorm.add_route([bj.lo_ip, bj.lo_ns_ip], link=dorm_bj, in_ns=True)
-    dorm.add_route("10.56.40.0/24", via=dorm.lo_ip, in_ns=True)
-
-    dorm.add_ipset("https://pppublic.oss-cn-beijing.aliyuncs.com/ipsets.txt", in_ns=True)
-    dorm.add_iptable("mangle", "PREROUTING", "-s 10.56.0.0/16 -m set ! --match-set china_ip dst -m set ! --match-set private_ip dst -j MARK --set-xmark 0x1/0xffffffff", in_ns=True)
-    dorm.add_cmd(dorm.ns_exec + "ip rule add fwmark 0x1 table 100")
-    dorm.add_cmd(dorm.ns_exec + "ip route add default via %s table 100" % dorm_hk.right_ip)
-    #cmd("iptables -t mangle -A POSTROUTING -o wg0 -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu")
-
-    hk.add_route(["10.56.100.0/24", "10.56.233.0/24", "10.56.40.0/24"], via=hk.lo_ns_ip, in_ns=False)
-    hk.add_route([dorm.lo_ip, dorm.lo_ns_ip], link=dorm_hk, in_ns=True)
-    hk.add_route([bj.lo_ip, bj.lo_ns_ip], link=hk_bj, in_ns=True)
-    hk.add_route("10.56.40.0/24", link=dorm_hk, in_ns=True)
-
-    dorm.save_cmds_as_bash("dorm.sh")
-    bj.save_cmds_as_bash("bj.sh")
-    hk.save_cmds_as_bash("hk.sh")
+    pass
