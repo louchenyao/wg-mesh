@@ -21,9 +21,9 @@ def yaoyao():
     iPhone = Host("iPhone", None, None, None, key=iPhone_key)
     mac = Host("mac", None, None, None, key=mac_key)
 
-    dorm_bj = Link(dorm, bj)
+    dorm_bj = Link(dorm, bj, mtu=1420-80)
+    dorm_hk = Link(dorm, hk, mtu=1420-80)
     hk_bj = Link(hk, bj)
-    dorm_hk = Link(dorm, hk)
 
     iPhone_bj = Link(iPhone, bj)
     mac_bj = Link(mac, bj)

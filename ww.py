@@ -82,12 +82,13 @@ class Host(object):
     def add_cmd(self, cmd):
         self.commands.append(cmd)
 
-    def connect(self, right, my_ip, right_ip, listen_port=None, endpoint=None):
+    def connect(self, right, my_ip, right_ip, mtu, listen_port=None, endpoint=None):
         dev = "wg.to." +right.hostname
 
         self.add_cmd(self.ns_exec + "ip link del dev %s | true" % dev)
         self.add_cmd(self.ns_exec + "ip link add dev %s type wireguard" % dev)
         self.add_cmd(self.ns_exec + "ip address add dev %s %s/30" % (dev, my_ip))
+        self.add_cmd(self.ns_exec + "ip link set mtu %s dev %s" % (mtu, dev))
         if listen_port:
             self.add_iptable("nat", "PREROUTING", "-p udp --dport %d -j DNAT --to-destination 10.233.233.2" % listen_port)
             self.add_cmd(self.ns_exec + "wg set %s listen-port %d private-key %s peer %s allowed-ips 0.0.0.0/0 persistent-keepalive 30" % (dev, listen_port, self.private_key_path, right.key.pk))
@@ -143,14 +144,14 @@ class Host(object):
         self.add_cmd(ns_exec + "ip route add %s via %s" % (ip_range, gw))
 
 class Link(object):
-    def __init__(self, left, right):
+    def __init__(self, left, right, mtu=1420):
         global PORT, IP
         PORT += 1
         IP += 4
         left_ip = "10.56.200.%d" % (IP+1)
         right_ip = "10.56.200.%d" % (IP+2)
-        left.connect(right, left_ip, right_ip, endpoint=right.address+":"+str(PORT))
-        right.connect(left, right_ip, left_ip, listen_port=PORT)
+        left.connect(right, left_ip, right_ip, mtu=mtu, endpoint=right.address+":"+str(PORT))
+        right.connect(left, right_ip, left_ip, mtu=mtu, listen_port=PORT)
 
         self.left = left
         self.left_ip = left_ip

@@ -3,4 +3,5 @@ bj.sh
 dorm.sh
 iPhone.sh
 mac.sh
+__pycache__
 *.key
