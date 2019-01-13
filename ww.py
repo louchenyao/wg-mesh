@@ -50,7 +50,7 @@ class Host(object):
         self.add_veth("gw", "gw-vm", "10.233.233.1", "10.233.233.2", "wgns")
         self.add_iptable("nat", "POSTROUTING", "-s 10.233.233.2/32 -j MASQUERADE")
         self.add_route("default", via="10.233.233.1", in_ns=True)
-        self.add_iptable("nat", "POSTROUTING", "-o gw-vm ! -d 10.233.233.2/32 -j MASQUERADE", in_ns=True)
+        self.add_iptable("nat", "POSTROUTING", "-o gw-vm ! -s 10.233.233.2/32 -j MASQUERADE", in_ns=True)
 
         self.add_veth("ww", "ww-vm", lo_ip, lo_ns_ip, "wgns")
 
