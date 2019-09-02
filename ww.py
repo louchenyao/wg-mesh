@@ -161,6 +161,24 @@ class Link(object):
         self.left_ip = left_ip
         self.right = right
         self.right_ip = right_ip
+        self.right_endpoint = right.address+":"+str(PORT)
+        self.mtu = mtu
+
+    def generate_left_config(self, filename):
+        with open(filename, "w") as f:
+            s = f"""[Interface]
+PrivateKey = {self.left.key.sk}
+Address = {self.left_ip}/30
+DNS = PLEASE FILL THE DNS SERVER IP
+MTU = {self.mtu}
+
+[Peer]
+PublicKey = {self.right.key.pk}
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = {self.right_endpoint}
+PersistentKeepalive = 30
+"""
+            f.write(s)
 
 def domain_to_ip(d):
     if d == None:

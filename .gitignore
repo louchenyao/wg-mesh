@@ -6,3 +6,4 @@ mac.sh
 lax.sh
 __pycache__
 *.key
+*.conf

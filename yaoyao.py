@@ -32,8 +32,9 @@ def yaoyao():
     bj.add_route(["10.56.100.0/24", "10.56.200.0/24", "10.56.233.0/24", "10.56.40.0/24", "1.1.1.1",], via=bj.lo_ns_ip, in_ns=False)
     # route hosts ip to the WAN
     bj.add_route(["bj.nossl.cn", "hk.nossl.cn"], via="10.233.233.1", in_ns=True)
-    # route hosts local ips via direct link
+    # route to hk
     bj.add_route([hk.lo_ip, hk.lo_ns_ip, "1.1.1.1"], link=hk_bj, in_ns=True)
+    # route to dorm
     bj.add_route([dorm.lo_ip, dorm.lo_ns_ip, "10.56.40.0/24",], link=dorm_bj, in_ns=True)
 
     # for non-chinese ip, route them to hk
@@ -72,6 +73,8 @@ def yaoyao():
     dorm.save_cmds_as_bash("dorm.sh")
     bj.save_cmds_as_bash("bj.sh")
     hk.save_cmds_as_bash("hk.sh")
+    mac_bj.generate_left_config("mac.conf")
+    iPhone_bj.generate_left_config("iPhone.conf")
 
 if __name__ == "__main__":
     yaoyao()
