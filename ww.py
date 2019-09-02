@@ -3,6 +3,7 @@
 import json
 import os
 import random
+import socket
 import subprocess
 
 PORT = 45674
@@ -33,7 +34,7 @@ class Key(object):
 class Host(object):
     def __init__(self, hostname, address, lo_ip, lo_ns_ip, home = None, key = None):
         self.hostname = hostname
-        self.address = address
+        self.address = domain_to_ip(address)
         self.lo_ip = lo_ip
         self.lo_ns_ip = lo_ns_ip
 
@@ -119,9 +120,12 @@ class Host(object):
         self.add_cmd(ns_exec + "iptables -t %s -D %s %s | true" % (table, chain, rule))
         self.add_cmd(ns_exec + "iptables -t %s -A %s %s" % (table, chain, rule))
 
-    def add_route(self, ip_range, in_ns, via=None, link=None):
-        if type(ip_range) in [tuple, list]:
-            for ip in ip_range:
+    def add_route(self, ip_ranges, in_ns, via=None, link=None):
+        if type(ip_ranges) in [tuple, list]:
+            for ip in ip_ranges:
+                # it is not a ip range, so it is probably a domain
+                if "/" not in ip:
+                    ip = domain_to_ip(ip)
                 self.add_route(ip, in_ns, via=via, link=link)
             return
 
@@ -140,8 +144,8 @@ class Host(object):
             raise Exception("Both via and link are None!")
 
         ns_exec = self.ns_exec if in_ns else ""
-        self.add_cmd(ns_exec + "ip route del %s | true" % ip_range)
-        self.add_cmd(ns_exec + "ip route add %s via %s" % (ip_range, gw))
+        self.add_cmd(ns_exec + "ip route del %s | true" % ip_ranges)
+        self.add_cmd(ns_exec + "ip route add %s via %s" % (ip_ranges, gw))
 
 class Link(object):
     def __init__(self, left, right, mtu=1420):
@@ -157,6 +161,22 @@ class Link(object):
         self.left_ip = left_ip
         self.right = right
         self.right_ip = right_ip
+
+def domain_to_ip(d):
+    if d == None:
+        return None
+    addr_info = socket.getaddrinfo(d, None)
+    addr = None
+    for res in addr_info:
+        if res[0] == socket.AF_INET:
+            # We found the first IPv4 address! Use this result
+            addr = res[4][0]
+            break
+        elif not addr:
+            # Otherwise, we record the first of the IPv6 addresses
+            addr = res[4][0]
+    #print(d, addr)
+    return addr
 
 if __name__ == "__main__":
     pass
