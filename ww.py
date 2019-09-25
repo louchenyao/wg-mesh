@@ -169,7 +169,7 @@ class Link(object):
             s = f"""[Interface]
 PrivateKey = {self.left.key.sk}
 Address = {self.left_ip}/30
-DNS = PLEASE FILL THE DNS SERVER IP
+DNS = 10.56.100.1
 MTU = {self.mtu}
 
 [Peer]

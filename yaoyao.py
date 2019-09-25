@@ -9,6 +9,12 @@ def yaoyao():
     #Key().dump("dorm.key")
     #Key().dump("iPhone.key")
     #Key().dump("mac.key")
+    
+    # friends
+    # friends_name = ["xzw", "lyh", "zhy", "qyx", "zys"]
+    # for friend in friends_name:
+    #     Key().dump(f"{friend}.key")
+
 
     # setup hosts
     dorm = Host("dorm", None, "10.56.100.3", "10.56.233.3", home="/home/louchenyao", key=Key(key_path="dorm.key"))
@@ -17,12 +23,24 @@ def yaoyao():
     iPhone = Host("iPhone", None, None, None, key=Key(key_path="iPhone.key"))
     mac = Host("mac", None, None, None, key=Key(key_path="mac.key"))
 
+    # friends hosts
+    friends_host = []
+    for friend in friends_name:
+        friends_host.append(Host(friend, None, None, None, key=Key(f"{friend}.key")))
+
     # setup wireguard tunnels
     dorm_bj = Link(dorm, bj, mtu=1360)
     dorm_hk = Link(dorm, hk, mtu=1360)
     hk_bj = Link(hk, bj, mtu=1360)
     iPhone_bj = Link(iPhone, bj, mtu=1360)
     mac_bj = Link(mac, bj, mtu=1360)
+
+
+    # friends to bj
+    friends_link = []
+    for friend in friends_host:
+        friends_link.append(Link(friend, bj, mtu=1360))
+
 
     ################################
     # bj                           #
@@ -50,7 +68,7 @@ def yaoyao():
     dorm.add_route(["bj.nossl.cn", "hk.nossl.cn"], via="10.233.233.1", in_ns=True)
     dorm.add_route([hk.lo_ip, hk.lo_ns_ip, "1.1.1.1"], link=dorm_hk, in_ns=True)
     dorm.add_route([bj.lo_ip, bj.lo_ns_ip], link=dorm_bj, in_ns=True)
-    dorm.add_route([iPhone_bj.left_ip, mac_bj.left_ip], link=dorm_bj, in_ns=True)
+    dorm.add_route([iPhone_bj.left_ip, mac_bj.left_ip] + [f.left_ip for f in friends_link], link=dorm_bj, in_ns=True)
     dorm.add_route("10.56.40.0/24", via=dorm.lo_ip, in_ns=True)
 
     dorm.add_ipset("https://pppublic.oss-cn-beijing.aliyuncs.com/ipsets.txt", in_ns=True)
@@ -65,7 +83,7 @@ def yaoyao():
     hk.add_route(["bj.nossl.cn", "hk.nossl.cn"], via="10.233.233.1", in_ns=True)
     hk.add_route([dorm.lo_ip, dorm.lo_ns_ip, "10.56.40.0/24"], link=dorm_hk, in_ns=True)
     hk.add_route([bj.lo_ip, bj.lo_ns_ip], link=hk_bj, in_ns=True)
-    hk.add_route([iPhone_bj.left_ip, mac_bj.left_ip], link=hk_bj, in_ns=True)
+    hk.add_route([iPhone_bj.left_ip, mac_bj.left_ip] + [f.left_ip for f in friends_link], link=hk_bj, in_ns=True)
    
     # save configurations
     iPhone.save_cmds_as_bash("iPhone.sh")
@@ -75,6 +93,10 @@ def yaoyao():
     hk.save_cmds_as_bash("hk.sh")
     mac_bj.generate_left_config("mac.conf")
     iPhone_bj.generate_left_config("iPhone.conf")
+    
+    # friends configurations
+    for link, name in zip(friends_link, friends_name):
+        link.generate_left_config(f"{name}.conf")
 
 if __name__ == "__main__":
     yaoyao()
