@@ -7,7 +7,7 @@ def gen_key(d):
 
 def yaoyao():
     # clients name
-    clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad"]
+    clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad", "lby"]
 
     # setup hosts
     dorm = Host("dorm", None, "10.56.100.3", "10.56.233.3", home="/home/louchenyao", key=Key(key_path="dorm.key"))
@@ -15,7 +15,7 @@ def yaoyao():
     hk = Host("hk", "hk.nossl.cn", "10.56.100.2", "10.56.233.2",home="/root", key=Key(key_path="hk.key"))
     clients_hosts = []
     for d in clients:
-        clients_hosts.append(Host(d, None, None, None, key=Key(f"{d}.key")))
+        clients_hosts.append(Host(d, None, None, None, key=Key(key_path=f"{d}.key")))
 
     # setup wireguard tunnels
     dorm_bj = Link(dorm, bj, mtu=1360)
