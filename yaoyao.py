@@ -7,7 +7,13 @@ def gen_key(d):
 
 def yaoyao():
     # clients name
-    clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad", "lby"]
+    clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad", "lby", "zd-mac", "zd-phone"]
+
+    # for c in clients:
+    #     gen_key(c)
+    # gen_key("dorm")
+    # gen_key("bj")
+    # gen_key("hk")
 
     # setup hosts
     dorm = Host("dorm", None, "10.56.100.3", "10.56.233.3", home="/home/louchenyao", key=Key(key_path="dorm.key"))
