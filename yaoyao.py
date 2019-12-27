@@ -7,7 +7,7 @@ def gen_key(d):
 
 def yaoyao():
     # clients name
-    clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad", "lby", "zd-mac", "zd-phone", "zd-3"]
+    clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad", "lby", "zd-mac", "zd-phone", "zd-3", "zd-4"]
 
     # for c in clients:
     #     gen_key(c)
