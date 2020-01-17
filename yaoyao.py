@@ -1,27 +1,22 @@
 #! /usr/bin/env python3
 
 from ww import *
+import shutil
 
 def gen_key(d):
     Key().dump(f"{d}.key")
 
 def yaoyao():
     # clients name
-    clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad", "lby", "zd-mac", "zd-phone", "zd-3", "zd-4"]
-
-    # for c in clients:
-    #     gen_key(c)
-    # gen_key("dorm")
-    # gen_key("bj")
-    # gen_key("hk")
+    clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad", "lby", "zd-mac", "zd-phone", "zd-3", "zd-4", "gram", "wmd"]
 
     # setup hosts
-    dorm = Host("dorm", None, "10.56.100.3", "10.56.233.3", home="/home/louchenyao", key=Key(key_path="dorm.key"))
-    bj = Host("bj", "bj.nossl.cn", "10.56.100.1", "10.56.233.1", home="/root", key=Key(key_path="bj.key"))
-    hk = Host("hk", "hk.nossl.cn", "10.56.100.2", "10.56.233.2",home="/root", key=Key(key_path="hk.key"))
+    dorm = Host("dorm", None, "10.56.100.3", "10.56.233.3", home="/home/louchenyao", key=Key(key_path="keys/dorm.key"))
+    bj = Host("bj", "bj.nossl.cn", "10.56.100.1", "10.56.233.1", home="/root", key=Key(key_path="keys/bj.key"))
+    hk = Host("hk", "hk.nossl.cn", "10.56.100.2", "10.56.233.2",home="/root", key=Key(key_path="keys/hk.key"))
     clients_hosts = []
     for d in clients:
-        clients_hosts.append(Host(d, None, None, None, key=Key(key_path=f"{d}.key")))
+        clients_hosts.append(Host(d, None, None, None, key=Key(key_path=f"keys/{d}.key")))
 
     # setup wireguard tunnels
     dorm_bj = Link(dorm, bj, mtu=1360)
@@ -77,13 +72,15 @@ def yaoyao():
     hk.add_route([d.left_ip for d in clients_links], link=hk_bj, in_ns=True)
    
     # save configurations
-    dorm.save_cmds_as_bash("dorm.sh")
-    bj.save_cmds_as_bash("bj.sh")
-    hk.save_cmds_as_bash("hk.sh")
+    shutil.rmtree("generated", ignore_errors=True)
+    os.mkdir("generated")
+    dorm.save_cmds_as_bash("generated/dorm.sh")
+    bj.save_cmds_as_bash("generated/bj.sh")
+    hk.save_cmds_as_bash("generated/hk.sh")
     
     # friends configurations
     for link, name in zip(clients_links, clients):
-        link.generate_left_config(f"{name}.conf")
+        link.generate_left_config(f"generated/{name}.conf")
 
 if __name__ == "__main__":
     yaoyao()
