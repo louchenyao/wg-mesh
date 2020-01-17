@@ -4,7 +4,7 @@ from ww import *
 import shutil
 
 def gen_key(d):
-    Key().dump(f"{d}.key")
+    Key().dump(f"keys/{d}.key")
 
 def yaoyao():
     # clients name
