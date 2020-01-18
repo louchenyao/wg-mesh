@@ -38,6 +38,15 @@ def install_golang():
     assert(os.system("sudo apt update") == 0)
     assert(os.system("sudo apt install -y golang-go") == 0)
 
+def enable_bbr():
+    # https://www.cyberciti.biz/cloud-computing/increase-your-linux-server-internet-speed-with-tcp-bbr-congestion-control/
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        conf_path = os.path.join(tmp_dir, "99-custom-kernel-bbr.conf")
+        with open(conf_path, "w") as f:
+            f.write("net.core.default_qdisc=fq\n")
+            f.write("net.ipv4.tcp_congestion_control=bbr")
+        assert(os.system(f"sudo cp {conf_path} /etc/sysctl.d") == 0)
+    assert(os.system(f"sudo sysctl --system") == 0)
 
 if __name__ == "__main__":
     install_golang()

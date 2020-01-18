@@ -29,7 +29,10 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     
     - name: Install golang and wireguard
-      run: python3 ./thirdparty_tools.py
+      run: |
+        python3 ./thirdparty.py
+        which go
+        go version
 
     - name: Test with pytest
       run: |

@@ -1,6 +1,7 @@
-from thirdparty_tools import build_any_proxy, build_freedns_go, install_wireguard, install_golang
+from thirdparty import build_any_proxy, build_freedns_go, install_wireguard, install_golang, enable_bbr
 
 import os
+import subprocess
 import tempfile
 
 
@@ -26,3 +27,13 @@ def test_install_golang():
 def test_install_wireguard():
     install_wireguard()
     assert(os.system("sudo wg") == 0)
+
+
+def test_enable_bbr():
+    enable_bbr()
+    qdisc = subprocess.check_output(
+        ["sysctl", "net.core.default_qdisc"]).decode().strip()
+    cc = subprocess.check_output(
+        ["sysctl", "net.ipv4.tcp_congestion_control"]).decode().strip()
+    assert(qdisc == "net.core.default_qdisc = fq")
+    assert(cc == "net.ipv4.tcp_congestion_control = bbr")
