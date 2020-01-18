@@ -4,7 +4,7 @@ from ww import *
 import shutil
 
 def gen_key(d):
-    Key().dump(f"keys/{d}.key")
+    Key(None).dump(f"keys/{d}.key")
 
 def yaoyao():
     bj_wan_ip = "39.96.60.177"

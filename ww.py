@@ -5,10 +5,10 @@ import os
 import subprocess
 
 class Key(object):
-    def __init__(self, sk = None, pk = None, key_path=None):
+    def __init__(self, key_path):
         if key_path:
             self.load(key_path)
-        elif not pk:
+        else:
             self.sk = subprocess.getoutput("wg genkey")
             self.pk = subprocess.getoutput("echo '%s' | wg pubkey" % self.sk)
 
