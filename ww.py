@@ -6,9 +6,6 @@ import random
 import socket
 import subprocess
 
-PORT = 45674
-IP = 0
-
 class Key(object):
     def __init__(self, sk = None, pk = None, key_path=None):
         if key_path:
@@ -91,8 +88,8 @@ class Host(object):
         self.add_cmd(self.ns_exec + "ip address add dev %s %s/30" % (dev, my_ip))
         self.add_cmd(self.ns_exec + "ip link set mtu %s dev %s" % (mtu, dev))
         if listen_port:
-            self.add_iptable("nat", "PREROUTING", "-p udp --dport %d -j DNAT --to-destination 10.233.233.2" % listen_port)
-            self.add_cmd(self.ns_exec + "wg set %s listen-port %d private-key %s peer %s allowed-ips 0.0.0.0/0 persistent-keepalive 30" % (dev, listen_port, self.private_key_path, right.key.pk))
+            self.add_iptable("nat", "PREROUTING", f"-p udp --dport {listen_port} -j DNAT --to-destination 10.233.233.2")
+            self.add_cmd(self.ns_exec + f"wg set {dev} listen-port {listen_port} private-key {self.private_key_path} peer {right.key.pk} allowed-ips 0.0.0.0/0 persistent-keepalive 30")
         else:
             self.add_cmd(self.ns_exec + "wg set %s private-key %s peer %s allowed-ips 0.0.0.0/0 endpoint %s persistent-keepalive 30" % (dev, self.private_key_path, right.key.pk, endpoint))
         self.add_iptable("mangle", "POSTROUTING", "-o %s -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu" % dev, in_ns=True)
@@ -148,20 +145,25 @@ class Host(object):
         self.add_cmd(ns_exec + "ip route add %s via %s" % (ip_ranges, gw))
 
 class Link(object):
-    def __init__(self, left, right, mtu=1420):
-        global PORT, IP
-        PORT += 1
-        IP += 4
-        left_ip = "10.56.200.%d" % (IP+1)
-        right_ip = "10.56.200.%d" % (IP+2)
-        left.connect(right, left_ip, right_ip, mtu=mtu, endpoint=right.address+":"+str(PORT))
-        right.connect(left, right_ip, left_ip, mtu=mtu, listen_port=PORT)
+    # cidr should be /30, which is used as the tunnel ip
+    def __init__(self, left, right, cidr, port, mtu=1420):
+        # check if the last digit is the multiple of 4
+        abc = ".".join(cidr.split(".")[:3])
+        d = int(cidr.split(".")[-1])
+        assert(d % 4 == 0)
+
+        left_ip = f"{abc}.{d+1}"
+        right_ip = f"{abc}.{d+2}"
+        left.connect(right, left_ip, right_ip, mtu=mtu, endpoint=right.address+":"+str(port))
+        right.connect(left, right_ip, left_ip, mtu=mtu, listen_port=port)
 
         self.left = left
         self.left_ip = left_ip
         self.right = right
         self.right_ip = right_ip
-        self.right_endpoint = right.address+":"+str(PORT)
+        self.right_endpoint = right.address+":"+str(port)
+        self.cidr = cidr
+        self.port = port
         self.mtu = mtu
 
     def generate_left_config(self, filename):
