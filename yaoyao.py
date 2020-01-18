@@ -7,12 +7,15 @@ def gen_key(d):
     Key().dump(f"keys/{d}.key")
 
 def yaoyao():
-    # clients name
+    bj_wan_ip = "39.96.60.177"
+    hk_wan_ip = "47.91.154.79"
+
+    # client names
     clients = ["iPhone", "Macbook", "xzw", "lyh", "zhy", "qyx", "zys", "iPad", "lby", "zd-mac", "zd-phone", "zd-3", "zd-4", "gram", "wmd"]
 
     # setup hosts
-    bj = Host("bj", "bj.nossl.cn", "10.56.100.1", "10.56.233.1", home="/root", key=Key(key_path="keys/bj.key"))
-    hk = Host("hk", "hk.nossl.cn", "10.56.100.2", "10.56.233.2",home="/root", key=Key(key_path="keys/hk.key"))
+    bj = Host("bj", bj_wan_ip, "10.56.100.1", "10.56.233.1", home="/root", key=Key(key_path="keys/bj.key"))
+    hk = Host("hk", hk_wan_ip, "10.56.100.2", "10.56.233.2",home="/root", key=Key(key_path="keys/hk.key"))
     clients_hosts = []
     for d in clients:
         clients_hosts.append(Host(d, None, None, None, key=Key(key_path=f"keys/{d}.key")))
@@ -36,7 +39,7 @@ def yaoyao():
     # route all wg-world ips into ww namespace
     bj.add_route(["10.56.100.0/24", "10.56.200.0/24", "10.56.233.0/24", "10.56.40.0/24", "1.1.1.1",], via=bj.lo_ns_ip, in_ns=False)
     # route hosts ip to the WAN
-    bj.add_route(["bj.nossl.cn", "hk.nossl.cn"], via="10.233.233.1", in_ns=True)
+    bj.add_route([bj_wan_ip, hk_wan_ip], via="10.233.233.1", in_ns=True)
     # route to hk
     bj.add_route([hk.lo_ip, hk.lo_ns_ip, "1.1.1.1"], link=hk_bj, in_ns=True)
 
@@ -50,7 +53,7 @@ def yaoyao():
     # hk                           #
     ################################
     hk.add_route(["10.56.100.0/24", "10.56.200.0/24", "10.56.233.0/24", "10.56.40.0/24"], via=hk.lo_ns_ip, in_ns=False)
-    hk.add_route(["bj.nossl.cn", "hk.nossl.cn"], via="10.233.233.1", in_ns=True)
+    hk.add_route([bj_wan_ip, hk_wan_ip], via="10.233.233.1", in_ns=True)
     hk.add_route([bj.lo_ip, bj.lo_ns_ip], link=hk_bj, in_ns=True)
     hk.add_route([d.left_ip for d in clients_links], link=hk_bj, in_ns=True)
    

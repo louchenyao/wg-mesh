@@ -2,8 +2,6 @@
 
 import json
 import os
-import random
-import socket
 import subprocess
 
 class Key(object):
@@ -29,9 +27,9 @@ class Key(object):
     
 
 class Host(object):
-    def __init__(self, hostname, address, lo_ip, lo_ns_ip, home = None, key = None):
+    def __init__(self, hostname, wan_ip, lo_ip, lo_ns_ip, home = None, key = None):
         self.hostname = hostname
-        self.address = domain_to_ip(address)
+        self.wan_ip = wan_ip
         self.lo_ip = lo_ip
         self.lo_ns_ip = lo_ns_ip
 
@@ -121,8 +119,6 @@ class Host(object):
         if type(ip_ranges) in [tuple, list]:
             for ip in ip_ranges:
                 # it is not a ip range, so it is probably a domain
-                if "/" not in ip:
-                    ip = domain_to_ip(ip)
                 self.add_route(ip, in_ns, via=via, link=link)
             return
 
@@ -154,14 +150,14 @@ class Link(object):
 
         left_ip = f"{abc}.{d+1}"
         right_ip = f"{abc}.{d+2}"
-        left.connect(right, left_ip, right_ip, mtu=mtu, endpoint=right.address+":"+str(port))
+        left.connect(right, left_ip, right_ip, mtu=mtu, endpoint=right.wan_ip+":"+str(port))
         right.connect(left, right_ip, left_ip, mtu=mtu, listen_port=port)
 
         self.left = left
         self.left_ip = left_ip
         self.right = right
         self.right_ip = right_ip
-        self.right_endpoint = right.address+":"+str(port)
+        self.right_endpoint = right.wan_ip+":"+str(port)
         self.cidr = cidr
         self.port = port
         self.mtu = mtu
@@ -181,22 +177,6 @@ Endpoint = {self.right_endpoint}
 PersistentKeepalive = 30
 """
             f.write(s)
-
-def domain_to_ip(d):
-    if d == None:
-        return None
-    addr_info = socket.getaddrinfo(d, None)
-    addr = None
-    for res in addr_info:
-        if res[0] == socket.AF_INET:
-            # We found the first IPv4 address! Use this result
-            addr = res[4][0]
-            break
-        elif not addr:
-            # Otherwise, we record the first of the IPv6 addresses
-            addr = res[4][0]
-    #print(d, addr)
-    return addr
 
 if __name__ == "__main__":
     pass
