@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 
+
 class Key(object):
     def __init__(self, key_path):
         if key_path:
@@ -18,16 +19,16 @@ class Key(object):
     def dump(self, path):
         with open(path, "w") as f:
             f.write(json.dumps({"sk": self.sk, "pk": self.pk}))
-    
+
     def load(self, path):
         with open(path) as f:
             j = json.loads(f.read())
             self.pk = j["pk"]
             self.sk = j["sk"]
-    
+
 
 class Host(object):
-    def __init__(self, hostname, wan_ip, lo_ip, lo_ns_ip, home = None, key = None):
+    def __init__(self, hostname, wan_ip, lo_ip, lo_ns_ip, home=None, key=None):
         self.hostname = hostname
         self.wan_ip = wan_ip
         self.lo_ip = lo_ip
@@ -42,11 +43,13 @@ class Host(object):
 
         self.ns_exec = "ip netns exec wgns "
         self.add_ns("wgns")
-        
+
         self.add_veth("gw", "gw-vm", "10.233.233.1", "10.233.233.2", "wgns")
-        self.add_iptable("nat", "POSTROUTING", "-s 10.233.233.2/32 -j MASQUERADE")
+        self.add_iptable("nat", "POSTROUTING",
+                         "-s 10.233.233.2/32 -j MASQUERADE")
         self.add_route("default", via="10.233.233.1", in_ns=True)
-        self.add_iptable("nat", "POSTROUTING", "-o gw-vm ! -s 10.233.233.2/32 -j MASQUERADE", in_ns=True)
+        self.add_iptable(
+            "nat", "POSTROUTING", "-o gw-vm ! -s 10.233.233.2/32 -j MASQUERADE", in_ns=True)
 
         self.add_veth("ww", "ww-vm", lo_ip, lo_ns_ip, "wgns")
 
@@ -79,18 +82,30 @@ class Host(object):
         self.commands.append(cmd)
 
     def connect(self, right, my_ip, right_ip, mtu, listen_port=None, endpoint=None):
-        dev = "wg.to." +right.hostname
+        dev = "wg.to." + right.hostname
 
         self.add_cmd(self.ns_exec + "ip link del dev %s | true" % dev)
         self.add_cmd(self.ns_exec + "ip link add dev %s type wireguard" % dev)
-        self.add_cmd(self.ns_exec + "ip address add dev %s %s/30" % (dev, my_ip))
+        self.add_cmd(self.ns_exec + "ip address add dev %s %s/30" %
+                     (dev, my_ip))
         self.add_cmd(self.ns_exec + "ip link set mtu %s dev %s" % (mtu, dev))
         if listen_port:
-            self.add_iptable("nat", "PREROUTING", f"-p udp --dport {listen_port} -j DNAT --to-destination 10.233.233.2")
-            self.add_cmd(self.ns_exec + f"wg set {dev} listen-port {listen_port} private-key {self.private_key_path} peer {right.key.pk} allowed-ips 0.0.0.0/0 persistent-keepalive 30")
+            self.add_iptable(
+                "nat", "PREROUTING", f"-p udp --dport {listen_port} -j DNAT --to-destination 10.233.233.2")
+            self.add_cmd(
+                self.ns_exec
+                + f"wg set {dev} listen-port {listen_port} private-key {self.private_key_path}"
+                + f" peer {right.key.pk} allowed-ips 0.0.0.0/0 persistent-keepalive 30"
+            )
         else:
-            self.add_cmd(self.ns_exec + "wg set %s private-key %s peer %s allowed-ips 0.0.0.0/0 endpoint %s persistent-keepalive 30" % (dev, self.private_key_path, right.key.pk, endpoint))
-        self.add_iptable("mangle", "POSTROUTING", "-o %s -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu" % dev, in_ns=True)
+            self.add_cmd(
+                self.ns_exec
+                + f"wg set {dev} private-key {self.private_key_path} peer {right.key.pk}"
+                + f" allowed-ips 0.0.0.0/0 endpoint {endpoint} persistent-keepalive 30"
+            )
+
+        self.add_iptable("mangle", "POSTROUTING",
+                         "-o %s -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu" % dev, in_ns=True)
         self.add_cmd(self.ns_exec + "ip link set up dev %s" % dev)
 
     def cmds_str(self):
@@ -98,7 +113,7 @@ class Host(object):
         for cmd in self.commands:
             s += cmd + "\n"
         return s
-    
+
     def save_cmds_as_bash(self, name):
         with open(name, "w") as f:
             f.write("#! /bin/bash\n\nset -e\n\n")
@@ -110,10 +125,12 @@ class Host(object):
         self.add_cmd("curl -o /tmp/ipset.txt " + url)
         self.add_cmd(ns_exec + "ipset --restore --exist < /tmp/ipset.txt")
 
-    def add_iptable(self, table, chain, rule, in_ns = False):
+    def add_iptable(self, table, chain, rule, in_ns=False):
         ns_exec = self.ns_exec if in_ns else ""
-        self.add_cmd(ns_exec + "iptables -t %s -D %s %s | true" % (table, chain, rule))
-        self.add_cmd(ns_exec + "iptables -t %s -A %s %s" % (table, chain, rule))
+        self.add_cmd(ns_exec + "iptables -t %s -D %s %s | true" %
+                     (table, chain, rule))
+        self.add_cmd(ns_exec + "iptables -t %s -A %s %s" %
+                     (table, chain, rule))
 
     def add_route(self, ip_ranges, in_ns, via=None, link=None):
         if type(ip_ranges) in [tuple, list]:
@@ -132,13 +149,15 @@ class Host(object):
             elif self.hostname == link.right.hostname:
                 gw = link.left_ip
             else:
-                raise Exception("%s is not the endpoint of link %s" % (self.hostname, link))
+                raise Exception("%s is not the endpoint of link %s" %
+                                (self.hostname, link))
         else:
             raise Exception("Both via and link are None!")
 
         ns_exec = self.ns_exec if in_ns else ""
         self.add_cmd(ns_exec + "ip route del %s | true" % ip_ranges)
         self.add_cmd(ns_exec + "ip route add %s via %s" % (ip_ranges, gw))
+
 
 class Link(object):
     # cidr should be /30, which is used as the tunnel ip
@@ -150,7 +169,8 @@ class Link(object):
 
         left_ip = f"{abc}.{d+1}"
         right_ip = f"{abc}.{d+2}"
-        left.connect(right, left_ip, right_ip, mtu=mtu, endpoint=right.wan_ip+":"+str(port))
+        left.connect(right, left_ip, right_ip, mtu=mtu,
+                     endpoint=right.wan_ip+":"+str(port))
         right.connect(left, right_ip, left_ip, mtu=mtu, listen_port=port)
 
         self.left = left
@@ -177,6 +197,7 @@ Endpoint = {self.right_endpoint}
 PersistentKeepalive = 30
 """
             f.write(s)
+
 
 if __name__ == "__main__":
     pass

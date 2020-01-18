@@ -3,6 +3,7 @@ from ww import Key
 import os
 import tempfile
 
+
 def test_Key():
     with tempfile.TemporaryDirectory() as tmp_dir:
         p = os.path.join(tmp_dir, "tmp.key")
