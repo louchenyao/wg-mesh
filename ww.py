@@ -27,6 +27,57 @@ class Key(object):
             self.sk = j["sk"]
 
 
+class Link(object):
+    # `link_cidr` should be `/30`, namely, the last digit of ip is the multiple of 4
+    # Suppose the `link_cidr="192.10.1.0", then the `left_ip` will be `192.10.1.1`,
+    # the `right_ip` will be `192.10.1.2`.
+    def __init__(self, left_key, right_key, right_wan_ip, link_cidr, port, mtu=1420):
+        # check if the last digit is the multiple of 4
+        abc = ".".join(link_cidr.split(".")[:3])
+        d = int(link_cidr.split(".")[-1])
+        assert(d % 4 == 0)
+
+        self.left_key = left_key
+        self.right_key = right_key
+        self.left_ip = f"{abc}.{d+1}"
+        self.right_ip = f"{abc}.{d+2}"
+        self.right_endpoint = f"{right_wan_ip}:{port}"
+        self.link_cidr = link_cidr
+        self.port = port
+        self.mtu = mtu
+
+    def generate_left_config(self, dns):
+        if dns:
+            dns = f"\nDNS = {dns}"
+        else:
+            dns = ""
+
+        return f"""[Interface]
+PrivateKey = {self.left_key.sk}
+Address = {self.left_ip}/30{dns}
+MTU = {self.mtu}
+
+[Peer]
+PublicKey = {self.right_key.pk}
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = {self.right_endpoint}
+PersistentKeepalive = 30
+"""
+
+    def generate_right_config(self):
+        return f"""[Interface]
+PrivateKey = {self.right_key.sk}
+Address = {self.right_ip}/30
+ListenPort = {self.port}
+MTU = {self.mtu}
+
+[Peer]
+PublicKey = {self.left_key.pk}
+AllowedIPs = 0.0.0.0/0, ::/0
+PersistentKeepalive = 30
+"""
+
+
 class Host(object):
     def __init__(self, hostname, wan_ip, lo_ip, lo_ns_ip, home=None, key=None):
         self.hostname = hostname
@@ -157,46 +208,6 @@ class Host(object):
         ns_exec = self.ns_exec if in_ns else ""
         self.add_cmd(ns_exec + "ip route del %s | true" % ip_ranges)
         self.add_cmd(ns_exec + "ip route add %s via %s" % (ip_ranges, gw))
-
-
-class Link(object):
-    # cidr should be /30, which is used as the tunnel ip
-    def __init__(self, left, right, cidr, port, mtu=1420):
-        # check if the last digit is the multiple of 4
-        abc = ".".join(cidr.split(".")[:3])
-        d = int(cidr.split(".")[-1])
-        assert(d % 4 == 0)
-
-        left_ip = f"{abc}.{d+1}"
-        right_ip = f"{abc}.{d+2}"
-        left.connect(right, left_ip, right_ip, mtu=mtu,
-                     endpoint=right.wan_ip+":"+str(port))
-        right.connect(left, right_ip, left_ip, mtu=mtu, listen_port=port)
-
-        self.left = left
-        self.left_ip = left_ip
-        self.right = right
-        self.right_ip = right_ip
-        self.right_endpoint = right.wan_ip+":"+str(port)
-        self.cidr = cidr
-        self.port = port
-        self.mtu = mtu
-
-    def generate_left_config(self, filename):
-        with open(filename, "w") as f:
-            s = f"""[Interface]
-PrivateKey = {self.left.key.sk}
-Address = {self.left_ip}/30
-DNS = 10.56.100.1
-MTU = {self.mtu}
-
-[Peer]
-PublicKey = {self.right.key.pk}
-AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = {self.right_endpoint}
-PersistentKeepalive = 30
-"""
-            f.write(s)
 
 
 if __name__ == "__main__":

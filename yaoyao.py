@@ -28,17 +28,17 @@ def yaoyao():
             Host(d, None, None, None, key=Key(key_path=f"keys/{d}.key")))
 
     # setup wireguard tunnels
-    hk_bj = Link(hk, bj, cidr="10.56.200.12", port="45677", mtu=1360)
+    hk_bj = Link(hk, bj, link_cidr="10.56.200.12", port="45677", mtu=1360)
 
     # clients to bj
     clients_links = []
-    cidr_d = 12
+    link_cidr_d = 12
     port = 45677
     for d in clients_hosts:
-        cidr_d += 4
+        link_cidr_d += 4
         port += 1
         clients_links.append(
-            Link(d, bj, cidr=f"10.56.200.{cidr_d}", port=port, mtu=1360))
+            Link(d, bj, link_cidr=f"10.56.200.{link_cidr_d}", port=port, mtu=1360))
 
     ################################
     # bj                           #
