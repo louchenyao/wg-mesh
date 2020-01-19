@@ -31,8 +31,6 @@ jobs:
     - name: Install golang and wireguard
       run: |
         python3 ./thirdparty.py
-        which go
-        go version
 
     - name: Test with pytest
       run: |

@@ -5,6 +5,8 @@ import tempfile
 
 
 def build_any_proxy(output_path):
+    print("===========")
+    os.system("go version")
     with tempfile.TemporaryDirectory() as tmp_dir:
         proj_dir = os.path.join(tmp_dir, "go-any-proxy")
         exe_path = os.path.join(proj_dir, "any_proxy")
@@ -16,6 +18,8 @@ def build_any_proxy(output_path):
 
 
 def build_freedns_go(output_path):
+    print("===========")
+    os.system("go version")
     with tempfile.TemporaryDirectory() as tmp_dir:
         proj_dir = os.path.join(tmp_dir, "freedns-go")
         exe_path = os.path.join(proj_dir, "freedns-go")
@@ -38,6 +42,10 @@ def install_golang():
     assert(os.system("sudo apt update") == 0)
     assert(os.system("sudo apt install -y golang-go") == 0)
 
+def install_ipset():
+    assert(os.system("sudo apt update") == 0)
+    assert(os.system("sudo apt install -y ipset") == 0)
+
 def conf_sysctl():
     # https://www.cyberciti.biz/cloud-computing/increase-your-linux-server-internet-speed-with-tcp-bbr-congestion-control/
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -50,6 +58,7 @@ def conf_sysctl():
     assert(os.system(f"sudo sysctl --system") == 0)
 
 if __name__ == "__main__":
+    install_ipset()
     install_golang()
     install_wireguard()
     conf_sysctl()
