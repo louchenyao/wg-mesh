@@ -31,12 +31,13 @@ def test_install_wireguard():
 
 def test_conf_sysctl():
     conf_sysctl()
-    qdisc = subprocess.check_output(
-        ["sysctl", "net.core.default_qdisc"]).decode().strip()
-    cc = subprocess.check_output(
-        ["sysctl", "net.ipv4.tcp_congestion_control"]).decode().strip()
-    forward = subprocess.check_output(
-        ["sysctl", "net.ipv4.ip_forward"]).decode().strip()
-    assert(qdisc == "net.core.default_qdisc = fq")
-    assert(cc == "net.ipv4.tcp_congestion_control = bbr")
-    assert(forward== "net.ipv4.ip_forward = 1" )
+    def check(conf_name, expected):
+        out = subprocess.check_output(["sysctl", conf_name]).decode().strip()
+        value = out.split("=")[1].strip()
+        assert(value == expected)
+
+    check("net.core.default_qdisc", "fq")
+    check("net.ipv4.tcp_congestion_control", "bbr")
+    check("net.ipv4.ip_forward", "1")
+    check("net.ipv4.conf.all.rp_filter", "0")
+    check("net.ipv4.conf.default.rp_filter", "0")

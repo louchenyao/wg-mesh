@@ -80,31 +80,52 @@ class Veth(object):
 
 
 class Wg(object):
-    def __init__(self, name, conf_str, ns):
+    def __init__(self, is_right: bool, name: str, left_key: Key, right_key: Key, addr: str,
+                 right_wan_ip: str, port: int, mtu: int, ns: NS):
         self.name = name
-        self.conf_str = conf_str
         self.ns = ns
 
+        self.tmp_dir = tempfile.mkdtemp()
+        sk_p = os.path.join(self.tmp_dir, "sk")
+        with open(sk_p, "w") as f:
+            if is_right:
+                f.write(right_key.sk)
+            else:
+                f.write(left_key.sk)
+
+        self.up_cmds = [
+            ns.gen_cmd(f"ip link add dev {name} type wireguard"),
+            ns.gen_cmd(f"ip address add dev {name} {addr}"),
+            ns.gen_cmd(f"ip link set mtu {mtu} dev {name}"),
+        ]
+
+        if is_right:
+            self.up_cmds.append(
+                ns.gen_cmd(f"wg set {name} listen-port {port} private-key {sk_p}"
+                           + f" peer {left_key.pk} allowed-ips 0.0.0.0/0 persistent-keepalive 30")
+            )
+        else:
+            self.up_cmds.append(
+                ns.gen_cmd(f"wg set {name} private-key {sk_p}"
+                           + f" peer {right_key.pk} endpoint {right_wan_ip}:{port}"
+                           + f" allowed-ips 0.0.0.0/0  persistent-keepalive 30")
+            )
+
+        self.up_cmds.append(ns.gen_cmd(f"ip link set up dev {name}"))
+        self.down_cmd = ns.gen_cmd(f"ip link del {name}")
+
     def up(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            conf_path = os.path.join(tmp_dir, self.name + ".conf")
-            with open(conf_path, "w") as f:
-                f.write(self.conf_str)
-            assert(os.system(self.ns.gen_cmd(f"wg-quick up {conf_path}")) == 0)
+        for c in self.up_cmds:
+            assert(os.system(c) == 0)
 
     def down(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            conf_path = os.path.join(tmp_dir, self.name + ".conf")
-            with open(conf_path, "w") as f:
-                f.write(self.conf_str)
-            assert(os.system(self.ns.gen_cmd(
-                f"wg-quick down {conf_path}")) == 0)
+        assert(os.system(self.down_cmd) == 0)
+        assert(os.system(f"rm -r {self.tmp_dir}") == 0)
+
 
 # `link_cidr` should be `/30`, namely, the last digit of ip is the multiple of 4
 # Suppose the `link_cidr="192.10.1.0/30", then the `left_ip` will be `192.10.1.1`,
 # the `right_ip` will be `192.10.1.2`.
-
-
 def gen_wg(name, left_key, right_key, right_wan_ip, link_cidr, port, mtu, left_ns, right_ns):
     # check if the last digit is the multiple of 4
     assert(link_cidr.endswith("/30"))
@@ -113,32 +134,15 @@ def gen_wg(name, left_key, right_key, right_wan_ip, link_cidr, port, mtu, left_n
     d = int(abcd.split(".")[-1])
     assert(d % 4 == 0)
 
-    left_ip = f"{abc}.{d+1}"
-    right_ip = f"{abc}.{d+2}"
+    left_ip = f"{abc}.{d+1}/30"
+    right_ip = f"{abc}.{d+2}/30"
 
-    left_conf = f"""[Interface]
-PrivateKey = {left_key.sk}
-Address = {left_ip}/30
-MTU = {mtu}
+    left = Wg(False, name, left_key, right_key, left_ip,
+              right_wan_ip, int(port), int(mtu), left_ns)
+    right = Wg(True, name, left_key, right_key, right_ip,
+               right_wan_ip, int(port), int(mtu), right_ns)
 
-[Peer]
-PublicKey = {right_key.pk}
-AllowedIPs = {link_cidr}
-Endpoint = {right_wan_ip}:{port}
-PersistentKeepalive = 30
-"""
-    right_conf = f"""[Interface]
-PrivateKey = {right_key.sk}
-Address = {right_ip}/30
-ListenPort = {port}
-MTU = {mtu}
-
-[Peer]
-PublicKey = {left_key.pk}
-AllowedIPs = {link_cidr}
-PersistentKeepalive = 30
-"""
-    return Wg(name, left_conf, left_ns), Wg(name, right_conf, right_ns)
+    return left, right
 
 
 class IPTableRule(object):
@@ -154,9 +158,9 @@ class IPTableRule(object):
 
 
 class Route(object):
-    def __init__(self, addr, via, ns: NS):
-        self.up_cmd = ns.gen_cmd(f"ip route add {addr} via {via}")
-        self.down_cmd = ns.gen_cmd(f"ip route del {addr} via {via}")
+    def __init__(self, addr, via, table, ns: NS):
+        self.up_cmd = ns.gen_cmd(f"ip route add {addr} via {via} table {table}")
+        self.down_cmd = ns.gen_cmd(f"ip route del {addr} via {via} table {table}")
 
     def up(self):
         assert(os.system(self.up_cmd) == 0)
@@ -164,6 +168,17 @@ class Route(object):
     def down(self):
         assert(os.system(self.down_cmd) == 0)
 
+class RouteRule(object):
+    def __init__(self, mark, table, ns: NS):
+        self.mark = mark
+        self.table = table
+        self.ns = ns
+    
+    def up(self):
+        assert(os.system(self.ns.gen_cmd(f"ip rule add fwmark {self.mark} {self.table}")) == 0)
+    
+    def down(self):
+        assert(os.system(self.ns.gen_cmd(f"ip rule del fwmark {self.mark} {self.table}")) == 0)
 
 class IPSet(object):
     def __init__(self, name: str, ips: list, ns: NS):
@@ -188,19 +203,24 @@ class IPSet(object):
     def down(self):
         assert(os.system(self.destroy) == 0)
 
+
 _china_ip_list_cache = []
+
+
 def chinaip_list():
     global _china_ip_list_cache
     if len(_china_ip_list_cache) != 0:
         return _china_ip_list_cache
 
-    r = requests.get("https://raw.githubusercontent.com/17mon/china_ip_list/master/china_ip_list.txt")
-    assert(r.status_code == 200)
+    r = requests.get(
+        "https://raw.githubusercontent.com/17mon/china_ip_list/master/china_ip_list.txt")
     _china_ip_list_cache = r.text.split()
     return _china_ip_list_cache
 
+
 def privateip_list():
     return ["192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8"]
+
 
 class Host(object):
     def __init__(self, hostname, wan_ip, lo_ip, lo_ns_ip, home=None, key=None):

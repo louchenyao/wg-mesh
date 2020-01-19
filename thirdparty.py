@@ -54,6 +54,8 @@ def conf_sysctl():
             f.write("net.core.default_qdisc=fq\n")
             f.write("net.ipv4.tcp_congestion_control=bbr\n")
             f.write("net.ipv4.ip_forward = 1\n")
+            f.write("net.ipv4.conf.all.rp_filter = 0\n")
+            f.write("net.ipv4.conf.default.rp_filter = 0\n")
         assert(os.system(f"sudo cp {conf_path} /etc/sysctl.d") == 0)
     assert(os.system(f"sudo sysctl --system") == 0)
 

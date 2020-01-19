@@ -1,4 +1,4 @@
-from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list
+from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list, RouteRule
 
 import os
 import subprocess
@@ -53,7 +53,8 @@ def test_wg():
     left_wg.up()
     right_wg.up()
 
-    assert(os.system(left_ns.gen_cmd("ping 192.168.1.10 -c 3")) == 0)
+    assert(os.system(left_ns.gen_cmd("ping 192.168.1.10 -c 1")) == 0)
+    assert(os.system(left_ns.gen_cmd("ping 192.168.1.10 -c 2")) == 0)
 
     right_wg.down()
     left_wg.down()
@@ -65,7 +66,7 @@ def test_wg():
 def test_IPTableRule():
     ns = NS("ns")
     veth = Veth("veth", "10.1.1.1/24", "10.1.1.2/24", global_ns, ns)
-    route = Route("1.1.1.1", "10.1.1.1", ns)
+    route = Route("1.1.1.1", "10.1.1.1", "main", ns)
     rule = IPTableRule("nat", "POSTROUTING",
                        "-s 10.1.1.2 -j MASQUERADE", global_ns)
 
@@ -85,7 +86,7 @@ def test_IPSet():
     def is_in_ipset(ipset_name, ip):
         return os.system(f"sudo ipset test {ipset_name} {ip}") == 0
 
-    s1 = IPSet("private_ip", privateip_list, global_ns)
+    s1 = IPSet("private_ip", privateip_list(), global_ns)
     s1.up()
     assert(is_in_ipset(s1.name, "10.1.1.1"))
     s1.down()
@@ -95,3 +96,7 @@ def test_IPSet():
     assert(is_in_ipset(cip.name, "114.114.114.114"))
     assert(is_in_ipset(cip.name, "8.8.8.8") == False)
     cip.down()
+
+def test_RouteRule():
+    # TODO: RouteRule should work now. But it is a little hard to test.
+    pass
