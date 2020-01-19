@@ -27,10 +27,11 @@ class Key(object):
             self.pk = j["pk"]
             self.sk = j["sk"]
 
+
 class NS(object):
     def __init__(self, ns_name):
         self.ns_name = ns_name
-    
+
     def gen_cmd(self, cmd):
         if self.ns_name == "__global_ns":
             return f"sudo {cmd}"
@@ -45,13 +46,17 @@ class NS(object):
         if self.ns_name != "__global_ns":
             assert(os.system(f"sudo ip netns del {self.ns_name}") == 0)
 
+
 global_ns = NS("__global_ns")
+
 
 class Veth(object):
     def __init__(self, name, left_addr, right_addr, left_ns, right_ns):
         self.up_cmds = [
-            left_ns.gen_cmd(f"ip link add {name}-left type veth peer name {name}-right"),
-            left_ns.gen_cmd(f"ip link set {name}-right netns {right_ns.ns_name}"),
+            left_ns.gen_cmd(
+                f"ip link add {name}-left type veth peer name {name}-right"),
+            left_ns.gen_cmd(
+                f"ip link set {name}-right netns {right_ns.ns_name}"),
             left_ns.gen_cmd(f"ip link set {name}-left up"),
             left_ns.gen_cmd(f"ip addr add {left_addr} dev {name}-left"),
 
@@ -63,14 +68,15 @@ class Veth(object):
             # delete one is enough
             left_ns.gen_cmd(f"ip link del {name}-left"),
         ]
-    
+
     def up(self):
         for c in self.up_cmds:
             assert(os.system(c) == 0)
-        
+
     def down(self):
         for c in self.down_cmds:
             assert(os.system(c) == 0)
+
 
 class Wg(object):
     def __init__(self, name, conf_str, ns):
@@ -90,11 +96,14 @@ class Wg(object):
             conf_path = os.path.join(tmp_dir, self.name + ".conf")
             with open(conf_path, "w") as f:
                 f.write(self.conf_str)
-            assert(os.system(self.ns.gen_cmd(f"wg-quick down {conf_path}")) == 0)
+            assert(os.system(self.ns.gen_cmd(
+                f"wg-quick down {conf_path}")) == 0)
 
 # `link_cidr` should be `/30`, namely, the last digit of ip is the multiple of 4
 # Suppose the `link_cidr="192.10.1.0/30", then the `left_ip` will be `192.10.1.1`,
 # the `right_ip` will be `192.10.1.2`.
+
+
 def gen_wg(name, left_key, right_key, right_wan_ip, link_cidr, port, mtu, left_ns, right_ns):
     # check if the last digit is the multiple of 4
     assert(link_cidr.endswith("/30"))
@@ -135,45 +144,43 @@ class IPTableRule(object):
     def __init__(self, table, chain, rule, ns: NS):
         self.up_cmd = ns.gen_cmd(f"iptables -t {table} -A {chain} {rule}")
         self.down_cmd = ns.gen_cmd(f"iptables -t {table} -D {chain} {rule}")
-    
+
     def up(self):
         assert(os.system(self.up_cmd) == 0)
 
     def down(self):
         assert(os.system(self.down_cmd) == 0)
 
+
 class Route(object):
     def __init__(self, addr, via, ns: NS):
         self.up_cmd = ns.gen_cmd(f"ip route add {addr} via {via}")
         self.down_cmd = ns.gen_cmd(f"ip route del {addr} via {via}")
-    
+
     def up(self):
-        assert(os.system(self.up_cmd)==0)
+        assert(os.system(self.up_cmd) == 0)
 
     def down(self):
-        assert(os.system(self.down_cmd)==0)
+        assert(os.system(self.down_cmd) == 0)
 
-class Netowrk(object):
-    def add_host(self):
-        pass
-    
-    def add(self, hostname, conf):
-        pass
-
-    def up(name):
-        for s in self.hosts[a]:
-            s.up()
-
-    def down(name):
-        for s in reverse(self.hosts[name]):
-            s.down()
 
 class IPSet(object):
-    def __init__(self, items: list, ns: NS):
-        pass
+    def __init__(self, name: str, ips: list, ns: NS):
+        self.create = ns.gen_cmd(f"ipset create {name} hash:net")
+        self.destroy = ns.gen_cmd(f"ipset destroy {name}")
+        self.name = name
+        self.ns = ns
+        self.ips = ips
 
-# china_ip = IPSet(..)
-# private_ip = IPSet(..)
+    def up(self):
+        assert(os.system(self.create) == 0)
+        for ip in self.ips:
+            assert(os.system(self.ns.gen_cmd(
+                f"ipset add {self.name} {ip}")) == 0)
+
+    def down(self):
+        assert(os.system(self.destroy) == 0)
+
 
 class Host(object):
     def __init__(self, hostname, wan_ip, lo_ip, lo_ns_ip, home=None, key=None):
