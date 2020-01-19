@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import tempfile
 
 
 class Key(object):
@@ -26,57 +27,153 @@ class Key(object):
             self.pk = j["pk"]
             self.sk = j["sk"]
 
-
-class Link(object):
-    # `link_cidr` should be `/30`, namely, the last digit of ip is the multiple of 4
-    # Suppose the `link_cidr="192.10.1.0", then the `left_ip` will be `192.10.1.1`,
-    # the `right_ip` will be `192.10.1.2`.
-    def __init__(self, left_key, right_key, right_wan_ip, link_cidr, port, mtu=1420):
-        # check if the last digit is the multiple of 4
-        abc = ".".join(link_cidr.split(".")[:3])
-        d = int(link_cidr.split(".")[-1])
-        assert(d % 4 == 0)
-
-        self.left_key = left_key
-        self.right_key = right_key
-        self.left_ip = f"{abc}.{d+1}"
-        self.right_ip = f"{abc}.{d+2}"
-        self.right_endpoint = f"{right_wan_ip}:{port}"
-        self.link_cidr = link_cidr
-        self.port = port
-        self.mtu = mtu
-
-    def generate_left_config(self, dns):
-        if dns:
-            dns = f"\nDNS = {dns}"
+class NS(object):
+    def __init__(self, ns_name):
+        self.ns_name = ns_name
+    
+    def gen_cmd(self, cmd):
+        if self.ns_name == "__global_ns":
+            return f"sudo {cmd}"
         else:
-            dns = ""
+            return f"sudo ip netns exec {self.ns_name} {cmd}"
 
-        return f"""[Interface]
-PrivateKey = {self.left_key.sk}
-Address = {self.left_ip}/30{dns}
-MTU = {self.mtu}
+    def up(self):
+        if self.ns_name != "__global_ns":
+            assert(os.system(f"sudo ip netns add {self.ns_name}") == 0)
+
+    def down(self):
+        if self.ns_name != "__global_ns":
+            assert(os.system(f"sudo ip netns del {self.ns_name}") == 0)
+
+global_ns = NS("__global_ns")
+
+class Veth(object):
+    def __init__(self, name, left_addr, right_addr, left_ns, right_ns):
+        self.up_cmds = [
+            left_ns.gen_cmd(f"ip link add {name}-left type veth peer name {name}-right"),
+            left_ns.gen_cmd(f"ip link set {name}-right netns {right_ns.ns_name}"),
+            left_ns.gen_cmd(f"ip link set {name}-left up"),
+            left_ns.gen_cmd(f"ip addr add {left_addr} dev {name}-left"),
+
+            right_ns.gen_cmd(f"ip link set {name}-right up"),
+            right_ns.gen_cmd(f"ip addr add {right_addr} dev {name}-right"),
+        ]
+
+        self.down_cmds = [
+            # delete one is enough
+            left_ns.gen_cmd(f"ip link del {name}-left"),
+        ]
+    
+    def up(self):
+        for c in self.up_cmds:
+            assert(os.system(c) == 0)
+        
+    def down(self):
+        for c in self.down_cmds:
+            assert(os.system(c) == 0)
+
+class Wg(object):
+    def __init__(self, name, conf_str, ns):
+        self.name = name
+        self.conf_str = conf_str
+        self.ns = ns
+
+    def up(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            conf_path = os.path.join(tmp_dir, self.name + ".conf")
+            with open(conf_path, "w") as f:
+                f.write(self.conf_str)
+            assert(os.system(self.ns.gen_cmd(f"wg-quick up {conf_path}")) == 0)
+
+    def down(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            conf_path = os.path.join(tmp_dir, self.name + ".conf")
+            with open(conf_path, "w") as f:
+                f.write(self.conf_str)
+            assert(os.system(self.ns.gen_cmd(f"wg-quick down {conf_path}")) == 0)
+
+# `link_cidr` should be `/30`, namely, the last digit of ip is the multiple of 4
+# Suppose the `link_cidr="192.10.1.0/30", then the `left_ip` will be `192.10.1.1`,
+# the `right_ip` will be `192.10.1.2`.
+def gen_wg(name, left_key, right_key, right_wan_ip, link_cidr, port, mtu, left_ns, right_ns):
+    # check if the last digit is the multiple of 4
+    assert(link_cidr.endswith("/30"))
+    abcd = link_cidr[:-3]
+    abc = ".".join(abcd.split(".")[:3])
+    d = int(abcd.split(".")[-1])
+    assert(d % 4 == 0)
+
+    left_ip = f"{abc}.{d+1}"
+    right_ip = f"{abc}.{d+2}"
+
+    left_conf = f"""[Interface]
+PrivateKey = {left_key.sk}
+Address = {left_ip}/30
+MTU = {mtu}
 
 [Peer]
-PublicKey = {self.right_key.pk}
-AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = {self.right_endpoint}
+PublicKey = {right_key.pk}
+AllowedIPs = {link_cidr}
+Endpoint = {right_wan_ip}:{port}
 PersistentKeepalive = 30
 """
-
-    def generate_right_config(self):
-        return f"""[Interface]
-PrivateKey = {self.right_key.sk}
-Address = {self.right_ip}/30
-ListenPort = {self.port}
-MTU = {self.mtu}
+    right_conf = f"""[Interface]
+PrivateKey = {right_key.sk}
+Address = {right_ip}/30
+ListenPort = {port}
+MTU = {mtu}
 
 [Peer]
-PublicKey = {self.left_key.pk}
-AllowedIPs = 0.0.0.0/0, ::/0
+PublicKey = {left_key.pk}
+AllowedIPs = {link_cidr}
 PersistentKeepalive = 30
 """
+    return Wg(name, left_conf, left_ns), Wg(name, right_conf, right_ns)
 
+
+class IPTableRule(object):
+    def __init__(self, table, chain, rule, ns: NS):
+        self.up_cmd = ns.gen_cmd(f"iptables -t {table} -A {chain} {rule}")
+        self.down_cmd = ns.gen_cmd(f"iptables -t {table} -D {chain} {rule}")
+    
+    def up(self):
+        assert(os.system(self.up_cmd) == 0)
+
+    def down(self):
+        assert(os.system(self.down_cmd) == 0)
+
+class Route(object):
+    def __init__(self, addr, via, ns: NS):
+        self.up_cmd = ns.gen_cmd(f"ip route add {addr} via {via}")
+        self.down_cmd = ns.gen_cmd(f"ip route del {addr} via {via}")
+    
+    def up(self):
+        assert(os.system(self.up_cmd)==0)
+
+    def down(self):
+        assert(os.system(self.down_cmd)==0)
+
+class Netowrk(object):
+    def add_host(self):
+        pass
+    
+    def add(self, hostname, conf):
+        pass
+
+    def up(name):
+        for s in self.hosts[a]:
+            s.up()
+
+    def down(name):
+        for s in reverse(self.hosts[name]):
+            s.down()
+
+class IPSet(object):
+    def __init__(self, items: list, ns: NS):
+        pass
+
+# china_ip = IPSet(..)
+# private_ip = IPSet(..)
 
 class Host(object):
     def __init__(self, hostname, wan_ip, lo_ip, lo_ns_ip, home=None, key=None):
