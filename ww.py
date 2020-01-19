@@ -2,6 +2,7 @@
 
 import json
 import os
+import requests
 import subprocess
 import tempfile
 
@@ -172,15 +173,34 @@ class IPSet(object):
         self.ns = ns
         self.ips = ips
 
+        self.ipset_txt = ""
+        for ip in self.ips:
+            self.ipset_txt += f"add {name} {ip}\n"
+
     def up(self):
         assert(os.system(self.create) == 0)
-        for ip in self.ips:
-            assert(os.system(self.ns.gen_cmd(
-                f"ipset add {self.name} {ip}")) == 0)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            p = os.path.join(tmp_dir, "ipset.txt")
+            with open(p, "w") as f:
+                f.write(self.ipset_txt)
+            assert(os.system(self.ns.gen_cmd(f"ipset restore < {p}")) == 0)
 
     def down(self):
         assert(os.system(self.destroy) == 0)
 
+_china_ip_list_cache = []
+def chinaip_list():
+    global _china_ip_list_cache
+    if len(_china_ip_list_cache) != 0:
+        return _china_ip_list_cache
+
+    r = requests.get("https://raw.githubusercontent.com/17mon/china_ip_list/master/china_ip_list.txt")
+    assert(r.status_code == 200)
+    _china_ip_list_cache = r.text.split()
+    return _china_ip_list_cache
+
+def privateip_list():
+    return ["192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8"]
 
 class Host(object):
     def __init__(self, hostname, wan_ip, lo_ip, lo_ns_ip, home=None, key=None):

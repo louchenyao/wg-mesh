@@ -1,4 +1,4 @@
-from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet
+from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list
 
 import os
 import subprocess
@@ -82,10 +82,16 @@ def test_IPTableRule():
     ns.down()
 
 def test_IPSet():
-    s = IPSet("private_ip", ["192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8"], global_ns)
-    s.up()
+    def is_in_ipset(ipset_name, ip):
+        return os.system(f"sudo ipset test {ipset_name} {ip}") == 0
 
-    out = subprocess.check_output(["sudo", "ipset", "test", "private_ip", "10.1.1.1"], stderr=subprocess.STDOUT).decode().strip()
-    assert("is in set" in out)
-
-    s.down()
+    s1 = IPSet("private_ip", privateip_list, global_ns)
+    s1.up()
+    assert(is_in_ipset(s1.name, "10.1.1.1"))
+    s1.down()
+    
+    cip = IPSet("china_ip", chinaip_list(), global_ns)
+    cip.up()
+    assert(is_in_ipset(cip.name, "114.114.114.114"))
+    assert(is_in_ipset(cip.name, "8.8.8.8") == False)
+    cip.down()
