@@ -5,8 +5,6 @@ import tempfile
 
 
 def build_any_proxy(output_path):
-    print("===========")
-    os.system("go version")
     with tempfile.TemporaryDirectory() as tmp_dir:
         proj_dir = os.path.join(tmp_dir, "go-any-proxy")
         exe_path = os.path.join(proj_dir, "any_proxy")
@@ -18,9 +16,6 @@ def build_any_proxy(output_path):
 
 
 def build_freedns_go(output_path):
-    print("===========")
-    os.system("go version")
-    os.system("echo $GOPATH")
     with tempfile.TemporaryDirectory() as tmp_dir:
         proj_dir = os.path.join(tmp_dir, "freedns-go")
         exe_path = os.path.join(proj_dir, "freedns-go")
