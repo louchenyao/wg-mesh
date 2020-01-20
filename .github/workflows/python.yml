@@ -9,17 +9,24 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [3.6, 3.7, 3.8]
+        python: [3.6, 3.7]
 
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python ${{ matrix.python }}
       uses: actions/setup-python@v1
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: ${{ matrix.python }}
     
-    - name: Install pytest and flake8
-      run: pip install pytest flake8
+    # We need this because the GitHub CI may already installed 1.12 version
+    # If we run ./thirdparty.py, there exist 1.12 and 1.13 simultaneously
+    - name: Setup go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+
+    - name: Install pypi libraries
+      run: pip install pytest flake8 requests
 
     - name: Lint with flake8
       run: |
@@ -28,7 +35,7 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     
-    - name: Install golang and wireguard
+    - name: Install dependencies
       run: |
         python3 ./thirdparty.py
 
