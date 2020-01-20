@@ -1,9 +1,6 @@
 dist: bionic
 
-language: go
-
-go:
-  - master
+language: minimal
 
 install:
  - pip install requests pytest
