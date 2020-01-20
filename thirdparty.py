@@ -47,7 +47,7 @@ def install_ipset():
 def conf_sysctl():
     # https://www.cyberciti.biz/cloud-computing/increase-your-linux-server-internet-speed-with-tcp-bbr-congestion-control/
     with tempfile.TemporaryDirectory() as tmp_dir:
-        conf_path = os.path.join(tmp_dir, "99-custom-net.conf")
+        conf_path = os.path.join(tmp_dir, "999-custom-net.conf")
         with open(conf_path, "w") as f:
             f.write("net.core.default_qdisc=fq\n")
             f.write("net.ipv4.tcp_congestion_control=bbr\n")
