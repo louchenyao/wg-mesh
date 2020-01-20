@@ -66,20 +66,16 @@ def test_wg():
 def test_IPTableRule():
     ns = NS("ns")
     veth = Veth("veth", "10.1.1.1/24", "10.1.1.2/24", global_ns, ns)
-    route = Route("1.1.1.1", "10.1.1.1", "main", ns)
-    rule = IPTableRule("nat", "POSTROUTING",
-                       "-s 10.1.1.2 -j MASQUERADE", global_ns)
+    rule = IPTableRule("filter", "OUTPUT", "-d 10.1.1.1 -j DROP", ns)
 
     ns.up()
     veth.up()
-    route.up()
 
-    assert(os.system(ns.gen_cmd("host google.com 1.1.1.1")) != 0)
+    assert(os.system(ns.gen_cmd("ping 10.1.1.1 -c 1")) == 0)
     rule.up()
-    assert(os.system(ns.gen_cmd("host google.com 1.1.1.1")) == 0)
+    assert(os.system(ns.gen_cmd("ping 10.1.1.1 -c 1")) != 0)
 
     rule.down()
-    route.down()
     veth.down()
     ns.down()
 
