@@ -3,8 +3,8 @@ dist: bionic
 language: minimal
 
 install:
- - pip install requests pytest
+ - pip3 install requests pytest
  - python3 ./thirdparty.py
  
-script:
+script: 
  - pytest
