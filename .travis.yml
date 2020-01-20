@@ -6,7 +6,7 @@ go:
   - master
 
 install:
- - pip install requests
+ - pip install requests pytest
  - python3 ./thirdparty.py
  
 script:
