@@ -95,5 +95,25 @@ def test_IPSet():
     cip.down()
 
 def test_RouteRule():
-    # TODO: RouteRule should work now. But it is a little hard to test.
-    pass
+    net = Net()
+    a = NS("a")
+    b = NS("b")
+    net.add(a)
+    net.add(b)
+    net.add([
+        Veth("ab", "192.168.1.1/24", "192.168.1.2/24", a, b),
+        Route("default", "192.168.1.233", "main", a),
+        Route("default", "192.168.1.2", "1", a),
+        IPTableRule("mangle", "OUTPUT", "-m set --match 192.168.1.2 dst -j mark --set-mark 0x1", a),
+    ])
+    a_rule = RouteRule("1", "1", a)
+
+
+    net.up()
+
+    assert(os.system("ping 192.168.1.2 -c 1") != 0)
+    a_rule.up()
+    assert(os.system("ping 192.168.1.2 -c 1") == 0)
+
+    a_rule.down()
+    net.down()
