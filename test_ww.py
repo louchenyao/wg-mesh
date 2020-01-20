@@ -1,7 +1,6 @@
 from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list, RouteRule, Net
 
 import os
-import subprocess
 import tempfile
 
 
@@ -79,6 +78,7 @@ def test_IPTableRule():
     veth.down()
     ns.down()
 
+
 def test_IPSet():
     def is_in_ipset(ipset_name, ip):
         return os.system(f"sudo ipset test {ipset_name} {ip}") == 0
@@ -87,12 +87,13 @@ def test_IPSet():
     s1.up()
     assert(is_in_ipset(s1.name, "10.1.1.1"))
     s1.down()
-    
+
     cip = IPSet("china_ip", chinaip_list(), global_ns)
     cip.up()
-    assert(is_in_ipset(cip.name, "114.114.114.114"))
+    assert(is_in_ipset(cip.name, "114.114.114.114") == True)
     assert(is_in_ipset(cip.name, "8.8.8.8") == False)
     cip.down()
+
 
 def test_RouteRule():
     net = Net()
@@ -105,10 +106,10 @@ def test_RouteRule():
         Veth("ab2", "192.168.10.1/24", "192.168.10.2/24", a, b),
         Route("192.168.1.2", "192.168.10.2", "1", a),
         IPTableRule("filter", "INPUT", "-i ab1-right -j DROP", b),
-          
     ])
 
-    a_iptable = IPTableRule("mangle", "OUTPUT", "-d 192.168.0.0/16 -j MARK --set-mark 1", a)
+    a_iptable = IPTableRule(
+        "mangle", "OUTPUT", "-d 192.168.0.0/16 -j MARK --set-mark 1", a)
     a_rule = RouteRule("1", "1", a)
 
     net.up()

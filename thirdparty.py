@@ -32,7 +32,8 @@ def install_wireguard():
     assert(os.system("sudo apt install -y wireguard") == 0)
     assert(os.system("wg --help") == 0)
     # ???
-    #assert(os.system("sudo modprobe wireguard"))
+    # assert(os.system("sudo modprobe wireguard"))
+
 
 def install_golang():
     assert(os.system("sudo add-apt-repository -y ppa:longsleep/golang-backports") == 0)
@@ -40,9 +41,11 @@ def install_golang():
     assert(os.system("sudo apt install -y golang-go") == 0)
     assert(os.system("go version") == 0)
 
+
 def install_ipset():
     assert(os.system("sudo apt update") == 0)
     assert(os.system("sudo apt install -y ipset") == 0)
+
 
 def conf_sysctl():
     # https://www.cyberciti.biz/cloud-computing/increase-your-linux-server-internet-speed-with-tcp-bbr-congestion-control/
@@ -56,6 +59,7 @@ def conf_sysctl():
             f.write("net.ipv4.conf.default.rp_filter = 0\n")
         assert(os.system(f"sudo cp {conf_path} /etc/sysctl.d") == 0)
     assert(os.system(f"sudo sysctl --system") == 0)
+
 
 if __name__ == "__main__":
     install_ipset()
