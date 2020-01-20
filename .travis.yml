@@ -3,6 +3,7 @@ dist: bionic
 language: minimal
 
 install:
+ - sudo apt update
  - sudo apt install python3-pip
  - pip3 install requests pytest
  - python3 ./thirdparty.py
