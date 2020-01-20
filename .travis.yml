@@ -1,16 +1,9 @@
-os: linux
 dist: bionic
 
-language: python
-python:
-  - "3.6"
-  - "3.7"
+language: go
 
-before_install:
-  # clean up travis golang installation
-  - which go
-  - rm -rf $(which go)
-  - rm -rf /home/travis/gopath/*
+go:
+  - master
 
 install:
  - pip install requests
