@@ -1,4 +1,4 @@
-from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list, RouteRule
+from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list, RouteRule, Net
 
 import os
 import subprocess
@@ -31,7 +31,7 @@ def test_veth():
     right_ns.up()
     veth.up()
 
-    assert(os.system(left_ns.gen_cmd("ping 10.1.1.2 -c 2")) == 0)
+    assert(os.system(left_ns.gen_cmd("timeout 0.2 ping 10.1.1.2 -c 1")) == 0)
 
     veth.down()
     right_ns.down()
@@ -71,9 +71,9 @@ def test_IPTableRule():
     ns.up()
     veth.up()
 
-    assert(os.system(ns.gen_cmd("ping 10.1.1.1 -c 1")) == 0)
+    assert(os.system(ns.gen_cmd("timeout 0.2 ping 10.1.1.1 -c 1")) == 0)
     rule.up()
-    assert(os.system(ns.gen_cmd("ping 10.1.1.1 -c 1")) != 0)
+    assert(os.system(ns.gen_cmd("timeout 0.2 ping 10.1.1.1 -c 1")) != 0)
 
     rule.down()
     veth.down()
@@ -101,19 +101,23 @@ def test_RouteRule():
     net.add(a)
     net.add(b)
     net.add([
-        Veth("ab", "192.168.1.1/24", "192.168.1.2/24", a, b),
-        Route("default", "192.168.1.233", "main", a),
-        Route("default", "192.168.1.2", "1", a),
-        IPTableRule("mangle", "OUTPUT", "-m set --match 192.168.1.2 dst -j mark --set-mark 0x1", a),
+        Veth("ab1", "192.168.1.1/24", "192.168.1.2/24", a, b),
+        Veth("ab2", "192.168.10.1/24", "192.168.10.2/24", a, b),
+        Route("192.168.1.2", "192.168.10.2", "1", a),
+        IPTableRule("filter", "INPUT", "-i ab1-right -j DROP", b),
+          
     ])
-    a_rule = RouteRule("1", "1", a)
 
+    a_iptable = IPTableRule("mangle", "OUTPUT", "-d 192.168.0.0/16 -j MARK --set-mark 1", a)
+    a_rule = RouteRule("1", "1", a)
 
     net.up()
 
-    assert(os.system("ping 192.168.1.2 -c 1") != 0)
+    assert(os.system(a.gen_cmd("timeout 0.2 ping 192.168.1.2 -c 1")) != 0)
+    a_iptable.up()
     a_rule.up()
-    assert(os.system("ping 192.168.1.2 -c 1") == 0)
+    assert(os.system(a.gen_cmd("timeout 0.2 ping 192.168.1.2 -c 1")) == 0)
 
+    a_iptable.down()
     a_rule.down()
     net.down()

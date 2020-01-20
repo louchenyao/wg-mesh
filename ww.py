@@ -175,10 +175,10 @@ class RouteRule(object):
         self.ns = ns
     
     def up(self):
-        assert(os.system(self.ns.gen_cmd(f"ip rule add fwmark {self.mark} {self.table}")) == 0)
+        assert(os.system(self.ns.gen_cmd(f"ip rule add fwmark {self.mark} table {self.table}")) == 0)
     
     def down(self):
-        assert(os.system(self.ns.gen_cmd(f"ip rule del fwmark {self.mark} {self.table}")) == 0)
+        assert(os.system(self.ns.gen_cmd(f"ip rule del fwmark {self.mark} table {self.table}")) == 0)
 
 class IPSet(object):
     def __init__(self, name: str, ips: list, ns: NS):
