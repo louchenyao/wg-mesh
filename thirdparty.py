@@ -30,6 +30,7 @@ def install_wireguard():
     assert(os.system("sudo add-apt-repository -y ppa:wireguard/wireguard") == 0)
     assert(os.system("sudo apt update") == 0)
     assert(os.system("sudo apt install -y wireguard") == 0)
+    assert(os.system("wg --help") == 0)
     # ???
     #assert(os.system("sudo modprobe wireguard"))
 
@@ -37,6 +38,7 @@ def install_golang():
     assert(os.system("sudo add-apt-repository -y ppa:longsleep/golang-backports") == 0)
     assert(os.system("sudo apt update") == 0)
     assert(os.system("sudo apt install -y golang-go") == 0)
+    assert(os.system("go version") == 0)
 
 def install_ipset():
     assert(os.system("sudo apt update") == 0)

@@ -17,16 +17,6 @@ def test_build_freedns_go():
         assert(os.path.isfile(os.path.join(tmp_dir, "freedns-go")))
 
 
-def test_install_golang():
-    install_golang()
-    assert(os.system("sudo go version") == 0)
-
-
-def test_install_wireguard():
-    install_wireguard()
-    assert(os.system("sudo wg") == 0)
-
-
 def test_conf_sysctl():
     conf_sysctl()
     def check(conf_name, expected):
