@@ -18,10 +18,12 @@ def build_any_proxy(output_path):
 
 
 def build_freedns_go(output_path):
+    print("===========")
+    os.system("go version")
+    os.system("echo $GOPATH")
     with tempfile.TemporaryDirectory() as tmp_dir:
         proj_dir = os.path.join(tmp_dir, "freedns-go")
         exe_path = os.path.join(proj_dir, "freedns-go")
-        os.system(f"cd {proj_dir} && GOOS=linux GOARCH=amd64 go version")
         assert(os.system(
             f"cd {tmp_dir} && git clone --depth 1 https://github.com/tuna/freedns-go.git") == 0)
         assert(
