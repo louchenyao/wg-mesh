@@ -18,8 +18,8 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
     
-    # We need this because the GitHub CI may already installed 1.12 version
-    # If we run ./thirdparty.py, there exist 1.12 and 1.13 simultaneously
+    # The GitHub CI may already installed 1.12 version
+    # If we run ./thirdparty.py and without this setup, there exist 1.12 and 1.13 simultaneously
     - name: Setup go
       uses: actions/setup-go@v1
       with:

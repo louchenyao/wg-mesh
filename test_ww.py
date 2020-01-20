@@ -73,9 +73,10 @@ def test_IPTableRule():
     ns.up()
     veth.up()
     route.up()
-    rule.up()
 
-    assert(os.system(ns.gen_cmd("ping 1.1.1.1 -c 2")) == 0)
+    assert(os.system(ns.gen_cmd("host google.com 1.1.1.1")) != 0)
+    rule.up()
+    assert(os.system(ns.gen_cmd("host google.com 1.1.1.1")) == 0)
 
     rule.down()
     route.down()
