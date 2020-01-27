@@ -220,6 +220,21 @@ def chinaip_list():
 def privateip_list():
     return ["192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8"]
 
+
+class IPSetBundle(object):
+    def __init__(self, match: tuple, not_match: tuple):
+        self.match = match
+        self.not_match = not_match
+    
+    def gen_iptables_condition(self):
+        s = ""
+        for m in self.match:
+            s += f"-m set --match-set {m.name} dst "
+        for m in self.not_match:
+            s += f"-m set ! --match-set {m.name} dst "
+        return s.strip()
+
+
 # ConfSet is a set of netowrk configs
 class ConfSet(object):
     def __init__(self):
@@ -292,8 +307,14 @@ class Network(object):
         rip = rwg.addr.split("/")[0]
         left.claim_lan_cidr(lip)
         right.claim_lan_cidr(rip)
-        self.edges[left.name].append([right.name, lip]) # from right to left via lip
-        self.edges[right.name].append([left.name, rip]) # from left to right via rip
+        self.edges[left.name].append([right.name, lip, rip])
+        self.edges[right.name].append([left.name, rip, lip])
+
+    def route_ipsetbundle_to_nat_gateway(self, ipsetbundle, src, gateway):
+        # 1. Find a path from src to gateway
+        # 2. Add the ipset to the hosts on the path
+        # 3. Add iptables to the hosts to do policy routing
+        pass
 
     def up(self):
         def compute_routeings(start):
@@ -305,7 +326,7 @@ class Network(object):
             while len(q) > 0:
                 u = q[0]
                 q = q[1:]
-                for v, gateway in self.edges[u]:
+                for v, gateway, _ in self.edges[u]:
                     if vis[v]:
                         continue
                     vis[v] = True
@@ -314,6 +335,7 @@ class Network(object):
                     # connect
                     for cidr in cidrs:
                         if cidr != gateway:
+                            #print(f"{v} -> {cidr} via {gateway}")
                             self.hosts[v].confs.add(Route(cidr, gateway, "main", self.hosts[v].ns))
 
         # compute routing about from other hosts to self.hosts[name].cidrs

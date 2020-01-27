@@ -97,6 +97,15 @@ def test_IPSet():
     cip.down()
 
 
+def test_IPSetBundle():
+    a = IPSet("a", ["192.168.1.0/24"], global_ns)
+    b = IPSet("b", ["192.168.2.0/24"], global_ns)
+    c = IPSet("c", ["192.168.3.0/24"], global_ns)
+    
+    bundle = IPSetBundle(match=[a, b], not_match=[c])
+    assert(bundle.gen_iptables_condition() == "-m set --match-set a dst -m set --match-set b dst -m set ! --match-set c dst")
+
+
 def test_RouteRule():
     net = ConfSet()
     a = NS("a")
