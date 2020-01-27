@@ -1,4 +1,4 @@
-from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list, RouteRule, ConfSet
+from ww import *
 
 import os
 import pytest
@@ -137,3 +137,42 @@ def test_ConfSet():
     print(e)
     # ns should be deleted by net due to the exception
     assert(os.system(global_ns.gen_cmd("ip netns exec ns ip addr")) != 0)
+
+
+def test_Network():
+    pass
+    # testbed = ConfSet()
+    # a_ns = NS("a")
+    # b_ns = NS("b")
+    # c_ns = NS("c")
+    # hub = NS("hub")
+    # testbed.add([a_ns, b_ns, c_ns, hub])
+    # testbed.add([
+    #     Veth("atohub", "192.168.1.2/24", "192.168.1.1/24", a_ns, hub),
+    #     Veth("btohub", "192.168.2.2/24", "192.168.2.1/24", b_ns, hub),
+    #     Veth("ctohub", "192.168.3.2/24", "192.168.3.1/24", c_ns, hub),
+    #     Route("default", "192.168.1.1", "main", a_ns),
+    #     Route("default", "192.168.2.1", "main", b_ns),
+    #     Route("default", "192.168.3.1", "main", c_ns),
+    # ])
+    # testbed.up()
+
+
+    # net = Network()
+    # a = Host("a", "192.168.1.2", Key(None), a_ns)
+    # b = Host("b", "192.168.2.2", Key(None), b_ns)
+    # c = Host("c", "192.168.3.2", Key(None), c_ns)
+    # net.add_host(a)
+    # net.add_host(b)
+    # net.add_host(c)
+
+    # net.connect("a", "b", "10.0.0.0/30", 50000)
+    # net.connect("b", "c", "10.0.0.4/30", 50001)
+
+    # net.up()
+    # # 10.0.0.6 is c's ip
+    # # if it is reachable, then it means Network() can automatically compute routes to all local ips in the network
+    # assert(os.system(a_ns.get("ping 10.0.0.6 -c 1")) == 0)
+    # net.down()
+
+    # testbed.down()
