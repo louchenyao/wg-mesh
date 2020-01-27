@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import json
 import os
 import requests
@@ -257,8 +259,6 @@ class Host(object):
         self.confs = ConfSet()
         self.ips = []
 
-    def connect
-
 
 class Network(object):
     def __init__(self):
@@ -324,3 +324,7 @@ class Network(object):
     def down(self):
         for name in self.hosts:
             self.hosts[name].confs.down()
+        
+
+if __name__ == "__main__":
+    pass
