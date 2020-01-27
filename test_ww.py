@@ -1,6 +1,7 @@
-from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list, RouteRule, Net
+from ww import Key, NS, Veth, gen_wg, global_ns, IPTableRule, Route, IPSet, chinaip_list, privateip_list, RouteRule, ConfSet
 
 import os
+import pytest
 import tempfile
 
 
@@ -63,20 +64,21 @@ def test_wg():
 
 
 def test_IPTableRule():
+    net = ConfSet()
     ns = NS("ns")
-    veth = Veth("veth", "10.1.1.1/24", "10.1.1.2/24", global_ns, ns)
-    rule = IPTableRule("filter", "OUTPUT", "-d 10.1.1.1 -j DROP", ns)
+    net.add(ns)
+    net.add(Veth("veth", "10.1.1.1/24", "10.1.1.2/24", global_ns, ns))
 
-    ns.up()
-    veth.up()
+    rule = IPTableRule("filter", "OUTPUT", "-d 10.1.1.1 -j DROP", ns)
+    
+    net.up()
 
     assert(os.system(ns.gen_cmd("timeout 0.2 ping 10.1.1.1 -c 1")) == 0)
     rule.up()
     assert(os.system(ns.gen_cmd("timeout 0.2 ping 10.1.1.1 -c 1")) != 0)
-
     rule.down()
-    veth.down()
-    ns.down()
+
+    net.down()
 
 
 def test_IPSet():
@@ -96,7 +98,7 @@ def test_IPSet():
 
 
 def test_RouteRule():
-    net = Net()
+    net = ConfSet()
     a = NS("a")
     b = NS("b")
     net.add(a)
@@ -122,3 +124,16 @@ def test_RouteRule():
     a_iptable.down()
     a_rule.down()
     net.down()
+
+
+def test_ConfSet():
+    net = ConfSet()
+    ns = NS("ns")
+    net.add(ns)
+    net.add(Route("1.1.1.1", "192.168.1.1", "main", ns)) # error: no gateway 192.168.1.1
+
+    with pytest.raises(Exception) as e:
+        net.up()
+    print(e)
+    # ns should be deleted by net due to the exception
+    assert(os.system(global_ns.gen_cmd("ip netns exec ns ip addr")) != 0)

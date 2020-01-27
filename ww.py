@@ -221,8 +221,8 @@ def chinaip_list():
 def privateip_list():
     return ["192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8"]
 
-# Net is a set of netowrk configs
-class Net(object):
+# ConfSet is a set of netowrk configs
+class ConfSet(object):
     def __init__(self):
         self.conf = []
     
@@ -231,11 +231,18 @@ class Net(object):
             self.conf += c
         else:
             self.conf.append(c)
-        
     
     def up(self):
+        succ = []
         for c in self.conf:
-            c.up()
+            try:
+                c.up()
+            except Exception as e:
+                # roll back
+                for c in succ[::-1]:
+                    c.down()
+                raise e
+            succ.append(c)
 
     def down(self):
         for c in self.conf[::-1]:
