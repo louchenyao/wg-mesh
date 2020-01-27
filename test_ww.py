@@ -140,39 +140,47 @@ def test_ConfSet():
 
 
 def test_Network():
-    pass
-    # testbed = ConfSet()
-    # a_ns = NS("a")
-    # b_ns = NS("b")
-    # c_ns = NS("c")
-    # hub = NS("hub")
-    # testbed.add([a_ns, b_ns, c_ns, hub])
-    # testbed.add([
-    #     Veth("atohub", "192.168.1.2/24", "192.168.1.1/24", a_ns, hub),
-    #     Veth("btohub", "192.168.2.2/24", "192.168.2.1/24", b_ns, hub),
-    #     Veth("ctohub", "192.168.3.2/24", "192.168.3.1/24", c_ns, hub),
-    #     Route("default", "192.168.1.1", "main", a_ns),
-    #     Route("default", "192.168.2.1", "main", b_ns),
-    #     Route("default", "192.168.3.1", "main", c_ns),
-    # ])
-    # testbed.up()
+    testbed = ConfSet()
+    a_ns = NS("a")
+    b_ns = NS("b")
+    c_ns = NS("c")
+    d_ns = NS("d")
+    hub = NS("hub")
+    testbed.add([a_ns, b_ns, c_ns, d_ns, hub])
+    testbed.add([
+        Veth("atohub", "192.168.1.2/24", "192.168.1.1/24", a_ns, hub),
+        Veth("btohub", "192.168.2.2/24", "192.168.2.1/24", b_ns, hub),
+        Veth("ctohub", "192.168.3.2/24", "192.168.3.1/24", c_ns, hub),
+        Veth("dtohub", "192.168.4.2/24", "192.168.4.1/24", d_ns, hub),
+        Route("default", "192.168.1.1", "main", a_ns),
+        Route("default", "192.168.2.1", "main", b_ns),
+        Route("default", "192.168.3.1", "main", c_ns),
+        Route("default", "192.168.4.1", "main", d_ns),
+    ])
 
+    net = Network()
+    a = Host("a", "192.168.1.2", Key(None), a_ns)
+    b = Host("b", "192.168.2.2", Key(None), b_ns)
+    c = Host("c", "192.168.3.2", Key(None), c_ns)
+    d = Host("d", "192.168.4.2", Key(None), d_ns)
+    net.add_host(a)
+    net.add_host(b)
+    net.add_host(c)
+    net.add_host(d)
+    net.connect("a", "b", "10.0.0.0/30", 50000)
+    net.connect("b", "c", "10.0.0.4/30", 50001)
+    net.connect("c", "d", "10.0.0.8/30", 50002)
+    net.connect("d", "a", "10.0.0.12/30", 50003)
 
-    # net = Network()
-    # a = Host("a", "192.168.1.2", Key(None), a_ns)
-    # b = Host("b", "192.168.2.2", Key(None), b_ns)
-    # c = Host("c", "192.168.3.2", Key(None), c_ns)
-    # net.add_host(a)
-    # net.add_host(b)
-    # net.add_host(c)
+    testbed.up()
+    net.up()
+    
+    # 10.0.0.6 is c's ip
+    # if it is reachable, then it means Network() can automatically compute routes to all local ips in the network
+    assert(os.system(a_ns.gen_cmd("ping 10.0.0.6 -c 1")) == 0)
 
-    # net.connect("a", "b", "10.0.0.0/30", 50000)
-    # net.connect("b", "c", "10.0.0.4/30", 50001)
+    assert(os.system(b_ns.gen_cmd("ping 10.0.0.13 -c 1")) == 0)
+    assert(os.system(c_ns.gen_cmd("ping 10.0.0.1 -c 1")) == 0)
 
-    # net.up()
-    # # 10.0.0.6 is c's ip
-    # # if it is reachable, then it means Network() can automatically compute routes to all local ips in the network
-    # assert(os.system(a_ns.get("ping 10.0.0.6 -c 1")) == 0)
-    # net.down()
-
-    # testbed.down()
+    net.down()
+    testbed.down()

@@ -84,6 +84,7 @@ class Wg(object):
                  right_wan_ip: str, port: int, mtu: int, ns: NS):
         self.name = name
         self.ns = ns
+        self.addr = addr
 
         self.tmp_dir = tempfile.mkdtemp()
         sk_p = os.path.join(self.tmp_dir, "sk")
@@ -250,8 +251,8 @@ class ConfSet(object):
 
 
 class Host(object):
-    def __init__(self, hostname: str, wan_ip: str, key: Key, ns: NS):
-        self.hostname = hostname
+    def __init__(self, name: str, wan_ip: str, key: Key, ns: NS):
+        self.name = name
         self.wan_ip = wan_ip
         self.key = key
         self.ns = ns
@@ -289,15 +290,40 @@ class Network(object):
         rip = rwg.addr.split("/")[0]
         left.ips.append(lip)
         right.ips.append(rip)
-        self.edges[left.name].append([right.name, rip])
-        self.edges[right.name].append([left.name, lip])
+        self.edges[left.name].append([right.name, lip]) # from right to left via lip
+        self.edges[right.name].append([left.name, rip]) # from left to right via rip
 
     def up(self):
-        # TODO: compute routes to all local ips
-        pass
+        def compute_routeings(start):
+            ips = self.hosts[start].ips
+            vis = {name: False for name in self.hosts}
+            vis[start] = True
+            q = [start]
+
+            while len(q) > 0:
+                u = q[0]
+                q = q[1:]
+                for v, gateway in self.edges[u]:
+                    if vis[v]:
+                        continue
+                    vis[v] = True
+                    q.append(v)
+
+                    # connect
+                    for ip in ips:
+                        if ip != gateway:
+                            self.hosts[v].confs.add(Route(ip, gateway, "main", self.hosts[v].ns))
+
+        # compute routing about from other hosts to self.hosts[name].ips
+        for name in self.hosts:
+            compute_routeings(name)
+        
+        for name in self.hosts:
+            self.hosts[name].confs.up()
 
     def down(self):
-        pass
+        for name in self.hosts:
+            self.hosts[name].confs.down()
         
 
 if __name__ == "__main__":
