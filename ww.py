@@ -1,5 +1,3 @@
-#! /usr/bin/env python3
-
 import json
 import os
 import requests
@@ -257,7 +255,11 @@ class Host(object):
         self.key = key
         self.ns = ns
         self.confs = ConfSet()
-        self.ips = []
+        self.lan_cidrs = []
+
+    # claim the cidr that is reachable from this host
+    def claim_lan_cidr(self, cidr):
+        self.lan_cidrs.append(cidr)
 
 
 class Network(object):
@@ -288,14 +290,14 @@ class Network(object):
         right.confs.add(rwg)
         lip = lwg.addr.split("/")[0]
         rip = rwg.addr.split("/")[0]
-        left.ips.append(lip)
-        right.ips.append(rip)
+        left.claim_lan_cidr(lip)
+        right.claim_lan_cidr(rip)
         self.edges[left.name].append([right.name, lip]) # from right to left via lip
         self.edges[right.name].append([left.name, rip]) # from left to right via rip
 
     def up(self):
         def compute_routeings(start):
-            ips = self.hosts[start].ips
+            cidrs = self.hosts[start].lan_cidrs
             vis = {name: False for name in self.hosts}
             vis[start] = True
             q = [start]
@@ -310,11 +312,11 @@ class Network(object):
                     q.append(v)
 
                     # connect
-                    for ip in ips:
-                        if ip != gateway:
-                            self.hosts[v].confs.add(Route(ip, gateway, "main", self.hosts[v].ns))
+                    for cidr in cidrs:
+                        if cidr != gateway:
+                            self.hosts[v].confs.add(Route(cidr, gateway, "main", self.hosts[v].ns))
 
-        # compute routing about from other hosts to self.hosts[name].ips
+        # compute routing about from other hosts to self.hosts[name].cidrs
         for name in self.hosts:
             compute_routeings(name)
         
@@ -324,7 +326,3 @@ class Network(object):
     def down(self):
         for name in self.hosts:
             self.hosts[name].confs.down()
-        
-
-if __name__ == "__main__":
-    pass
