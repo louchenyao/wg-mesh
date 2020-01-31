@@ -238,7 +238,7 @@ class IPSetBundle(object):
 
 class AnyProxy(object):
     def up(self):
-        assert(os.system("ulimit -n 1048576") == 0)
+        assert(os.system("ulimit -n 65535") == 0)
         bin = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
             "bin",
