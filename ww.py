@@ -96,6 +96,8 @@ class Wg(object):
             ns.gen_cmd(f"ip link add dev {name} type wireguard"),
             ns.gen_cmd(f"ip address add dev {name} {addr}"),
             ns.gen_cmd(f"ip link set mtu {mtu} dev {name}"),
+            # the encrypted wireguard traffic will be marked with 51820
+            ns.gen_cmd(f"wg set {name} fwmark 51820"),
         ]
 
         if is_right:
