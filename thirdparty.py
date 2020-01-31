@@ -66,3 +66,13 @@ if __name__ == "__main__":
     install_golang()
     install_wireguard()
     conf_sysctl()
+
+
+    bin_dir = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "bin"
+    )
+    os.system(f"mkdir -p {bin_dir}")
+    build_freedns_go(bin_dir)
+    build_any_proxy(bin_dir)
+    

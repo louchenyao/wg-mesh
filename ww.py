@@ -236,6 +236,23 @@ class IPSetBundle(object):
             s += f"-m set ! --match-set {m.name} dst "
         return s.strip()
 
+class AnyProxy(object):
+    def __init__(self):
+        # chech ulimit -n
+        ulimit = subprocess.run(['sh', '-c', 'ulimit -n'], stdout=subprocess.PIPE)
+        assert(int(ulimit.stdout.decode()) > 65535)
+    
+    def up(self):
+        bin = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "bin",
+            "any_proxy",
+        )
+        self.p = subprocess.Popen([bin, '-l=:3140'])
+    
+    def down(self):
+        self.p.terminate()
+
 
 # ConfSet is a set of netowrk configs
 class ConfSet(object):

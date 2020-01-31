@@ -3,6 +3,7 @@ from ww import *
 import os
 import pytest
 import tempfile
+import time 
 
 
 def test_Key():
@@ -134,6 +135,21 @@ def test_RouteRule():
     a_rule.down()
     net.down()
 
+def test_AnyProxy(capsys):
+    # somke test
+    # It is a little hard to test the any_proxy hehavior since it only improve performances in our case
+    ap = AnyProxy()
+    ap.up()
+    time.sleep(1)
+    ap.down()
+
+    log_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "bin",
+        "any_proxy.log",
+    )
+    assert(os.path.exists(log_path))
+    os.remove(log_path)
 
 def test_ConfSet():
     net = ConfSet()
