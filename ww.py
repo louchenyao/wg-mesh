@@ -115,13 +115,15 @@ class Wg(object):
         self.up_cmds.append(ns.gen_cmd(f"ip link set up dev {name}"))
         self.down_cmd = ns.gen_cmd(f"ip link del {name}")
 
+    def __del__(self):
+        assert(os.system(f"rm -r {self.tmp_dir}") == 0)
+
     def up(self):
         for c in self.up_cmds:
             assert(os.system(c) == 0)
 
     def down(self):
         assert(os.system(self.down_cmd) == 0)
-        assert(os.system(f"rm -r {self.tmp_dir}") == 0)
 
 
 # `link_cidr` should be `/30`, namely, the last digit of ip is the multiple of 4
@@ -152,6 +154,7 @@ class IPTableRule(object):
         self.down_cmd = ns.gen_cmd(f"iptables -t {table} -D {chain} {rule}")
 
     def up(self):
+        #print(f"+ {self.up_cmd}")
         assert(os.system(self.up_cmd) == 0)
 
     def down(self):
@@ -164,6 +167,7 @@ class Route(object):
         self.down_cmd = ns.gen_cmd(f"ip route del {addr} via {via} table {table}")
 
     def up(self):
+        #print(f"+ {self.up_cmd}")
         assert(os.system(self.up_cmd) == 0)
 
     def down(self):
@@ -260,6 +264,9 @@ class ConfSet(object):
             self.conf += c
         else:
             self.conf.append(c)
+
+    def add_begin(self, c):
+        self.conf = [c] + self.conf
     
     def up(self):
         succ = []
@@ -268,8 +275,8 @@ class ConfSet(object):
                 c.up()
             except Exception as e:
                 # roll back
-                for c in succ[::-1]:
-                    c.down()
+                #for c in succ[::-1]:
+                #    c.down()
                 raise e
             succ.append(c)
 
@@ -285,12 +292,49 @@ class Host(object):
         self.key = key
         self.ns = ns
         self.confs = ConfSet()
+        self.ipsets_in_confs = {}
         self.lan_cidrs = []
+
+        self.route_table_counter = 100
 
     # claim the cidr that is reachable from this host
     def claim_lan_cidr(self, cidr):
         self.lan_cidrs.append(cidr)
+    
+    def add_ipset(self, ipset):
+        if ipset.name not in self.ipsets_in_confs:
+            # reconstruct it to make sure the ipset is in self.ns
+            ipset = IPSet(ipset.name, ipset.ips, self.ns)
+            self.confs.add_begin(ipset)
+            self.ipsets_in_confs[ipset.name] = True
 
+    def policy_route(self, local_output: bool, nat_gateway: bool, src_ip: str, ipsetbundle: IPSetBundle, next_hop: str):
+        assert(not(local_output and nat_gateway))
+
+        route_table = self.route_table_counter
+        self.route_table_counter += 1
+
+        bundle_cond = ipsetbundle.gen_iptables_condition()
+        match_src =f"-s {src_ip}"
+        mark_0 = "-m mark --mark 0"
+        not_established= "-m state ! --state ESTABLISHED,RELATED"
+        target = f"-j MARK --set-mark {route_table}"
+
+        if local_output:
+            # important:
+            # uses connmark to track the connection so for the traffic originating from the outside won't go through the table
+            # test cases may not test this well! Be careful when making change.
+            self.confs.add(IPTableRule("mangle", "OUTPUT", f"{bundle_cond} {mark_0} {not_established} -j CONNMARK --set-mark {route_table}", self.ns))
+            self.confs.add(IPTableRule("mangle", "OUTPUT", f"-m connmark --mark {route_table} {target}", self.ns)) # equals to `-j restore-mark`
+            self.confs.add(IPTableRule("nat", "POSTROUTING", f"-m mark --mark {route_table} -j SNAT --to-source {src_ip}", self.ns))
+        elif not nat_gateway:
+            self.confs.add(IPTableRule("mangle", "PREROUTING", f"{bundle_cond} {mark_0} {match_src} {target}", self.ns))
+        else:
+            self.confs.add(IPTableRule("nat", "POSTROUTING", f"{bundle_cond} {mark_0} {match_src}  -j MASQUERADE", self.ns))
+
+        if not nat_gateway:
+            self.confs.add(Route("default", next_hop, route_table, self.ns))
+            self.confs.add(RouteRule(route_table, route_table, self.ns))
 
 class Network(object):
     def __init__(self):
@@ -325,11 +369,56 @@ class Network(object):
         self.edges[left.name].append([right.name, lip, rip])
         self.edges[right.name].append([left.name, rip, lip])
 
-    def route_ipsetbundle_to_nat_gateway(self, ipsetbundle, src, gateway):
-        # 1. Find a path from src to gateway
-        # 2. Add the ipset to the hosts on the path
-        # 3. Add iptables to the hosts to do policy routing
-        pass
+    def route_ipsetbundle_to_nat_gateway(self, ipsetbundle: IPSetBundle, src: str, gateway: str):
+        # uses bfs to find a shortest path 
+        def shortest_path(start: str, end: str):
+            vis = {name: False for name in self.hosts}
+            edges = {name: () for name in self.hosts}
+
+            vis[start] = True
+            q = [start]
+
+            while len(q) > 0:
+                u = q[0]
+                q = q[1:]
+                for v, tunnel_ip, next_hop in self.edges[u]:
+                    if vis[v]:
+                        continue
+                    vis[v] = True
+                    q.append(v)
+                    edges[v] = (u, v, tunnel_ip, next_hop) # u -> v via next_hop
+
+                    if v == end:
+                        break
+            
+            assert(vis[v])
+            # recover the path from `start` to `end`
+            paths = []
+            u = end
+            while u != start:
+                paths.append(edges[u])
+                u = edges[u][0]
+            paths = paths[::-1] # reverse edges
+            return paths
+
+        
+        paths = shortest_path(src, gateway)
+        print(paths)
+
+        # Add ipsets to the hosts on the path
+        nodes = [paths[0][0],]
+        for e in paths:
+            nodes.append(e[1])
+        for node in nodes:
+            for ipset in ipsetbundle.match + ipsetbundle.not_match:
+                self.hosts[node].add_ipset(ipset)
+
+        # setup policy routing on the hosts
+        src_ip = paths[0][2] # src_ip should be the tunnel ip on the `src` node 
+        for i, (u, _, _, next_hop) in enumerate(paths):
+            local_output = i == 0
+            self.hosts[u].policy_route(local_output, False, src_ip, ipsetbundle, next_hop)
+        self.hosts[gateway].policy_route(False, True, src_ip, ipsetbundle, "")
 
     def up(self):
         def compute_routeings(start):
@@ -341,7 +430,7 @@ class Network(object):
             while len(q) > 0:
                 u = q[0]
                 q = q[1:]
-                for v, gateway, _ in self.edges[u]:
+                for v, next_hop, _ in self.edges[u]:
                     if vis[v]:
                         continue
                     vis[v] = True
@@ -349,14 +438,14 @@ class Network(object):
 
                     # connect
                     for cidr in cidrs:
-                        if cidr != gateway:
-                            #print(f"{v} -> {cidr} via {gateway}")
-                            self.hosts[v].confs.add(Route(cidr, gateway, "main", self.hosts[v].ns))
+                        if cidr != next_hop:
+                            #print(f"{v} -> {cidr} via {next_hop}")
+                            self.hosts[v].confs.add(Route(cidr, next_hop, "main", self.hosts[v].ns))
 
         # compute routing about from other hosts to self.hosts[name].cidrs
         for name in self.hosts:
             compute_routeings(name)
-        
+
         for name in self.hosts:
             self.hosts[name].confs.up()
 

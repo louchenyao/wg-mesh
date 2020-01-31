@@ -138,18 +138,19 @@ def test_RouteRule():
 def test_AnyProxy(capsys):
     # somke test
     # It is a little hard to test the any_proxy hehavior since it only improve performances in our case
-    ap = AnyProxy()
-    ap.up()
-    time.sleep(1)
-    ap.down()
+    pass
+    # ap = AnyProxy()
+    # ap.up()
+    # time.sleep(1)
+    # ap.down()
 
-    log_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        "bin",
-        "any_proxy.log",
-    )
-    assert(os.path.exists(log_path))
-    os.remove(log_path)
+    # log_path = os.path.join(
+    #     os.path.dirname(os.path.realpath(__file__)),
+    #     "bin",
+    #     "any_proxy.log",
+    # )
+    # assert(os.path.exists(log_path))
+    # os.remove(log_path)
 
 def test_ConfSet():
     net = ConfSet()
@@ -198,14 +199,27 @@ def test_Network():
     net.connect("d", "a", "10.0.0.12/30", 50003)
 
     testbed.up()
+
+    # routing all the traffic, whose destination is hub, to `c` 
+    hub = IPSet("hub", ["192.168.0.0/16"], global_ns)
+    bundle = IPSetBundle(match=[hub], not_match=[])
+    net.route_ipsetbundle_to_nat_gateway(bundle, "a", "c")
+
     net.up()
-    
+    # case 1:
     # 10.0.0.6 is c's ip
     # if it is reachable, then it means Network() can automatically compute routes to all local ips in the network
     assert(os.system(a_ns.gen_cmd("ping 10.0.0.6 -c 1")) == 0)
-
     assert(os.system(b_ns.gen_cmd("ping 10.0.0.13 -c 1")) == 0)
     assert(os.system(c_ns.gen_cmd("ping 10.0.0.1 -c 1")) == 0)
 
+    # case 2:
+    # test if the nat works
+    assert(os.system(a_ns.gen_cmd("ping 192.168.1.1 -c 1"))==0)
+    p = subprocess.run(["sh", "-c", a_ns.gen_cmd("traceroute 192.168.1.1")], stdout=subprocess.PIPE)
+    assert(p.returncode == 0)
+    print(p.stdout.decode())
+    assert("10.0.0" in p.stdout.decode())
+    
     net.down()
     testbed.down()
