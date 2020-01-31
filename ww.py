@@ -237,12 +237,8 @@ class IPSetBundle(object):
         return s.strip()
 
 class AnyProxy(object):
-    def __init__(self):
-        # chech ulimit -n
-        ulimit = subprocess.run(['sh', '-c', 'ulimit -n'], stdout=subprocess.PIPE)
-        assert(int(ulimit.stdout.decode()) > 65535)
-    
     def up(self):
+        assert(os.system("ulimit -n 1048576") == 0)
         bin = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
             "bin",
