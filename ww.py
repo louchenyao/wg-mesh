@@ -275,8 +275,8 @@ class ConfSet(object):
                 c.up()
             except Exception as e:
                 # roll back
-                #for c in succ[::-1]:
-                #    c.down()
+                for c in succ[::-1]:
+                    c.down()
                 raise e
             succ.append(c)
 
@@ -340,6 +340,7 @@ class Network(object):
     def __init__(self):
         self.hosts = {}
         self.edges = {}
+        self.computed_routing_info = False
 
     def add_host(self, host):
         self.hosts[host.name] = host
@@ -420,7 +421,12 @@ class Network(object):
             self.hosts[u].policy_route(local_output, False, src_ip, ipsetbundle, next_hop)
         self.hosts[gateway].policy_route(False, True, src_ip, ipsetbundle, "")
 
-    def up(self):
+    def _compute_route(self):
+        # only do this once
+        if self.computed_routing_info:
+            return
+        self.computed_routing_info = True
+
         def compute_routeings(start):
             cidrs = self.hosts[start].lan_cidrs
             vis = {name: False for name in self.hosts}
@@ -446,9 +452,9 @@ class Network(object):
         for name in self.hosts:
             compute_routeings(name)
 
-        for name in self.hosts:
-            self.hosts[name].confs.up()
+    def up(self, host: str):
+        self._compute_route()
+        self.hosts[host].confs.up()
 
-    def down(self):
-        for name in self.hosts:
-            self.hosts[name].confs.down()
+    def down(self, host: str):
+        self.hosts[host].confs.down()

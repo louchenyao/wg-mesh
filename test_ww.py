@@ -205,7 +205,9 @@ def test_Network():
     bundle = IPSetBundle(match=[hub], not_match=[])
     net.route_ipsetbundle_to_nat_gateway(bundle, "a", "c")
 
-    net.up()
+    for h in ["a", "b", "c", "d"]:
+        net.up(h)
+
     # case 1:
     # 10.0.0.6 is c's ip
     # if it is reachable, then it means Network() can automatically compute routes to all local ips in the network
@@ -221,5 +223,6 @@ def test_Network():
     print(p.stdout.decode())
     assert("10.0.0" in p.stdout.decode())
     
-    net.down()
+    for h in ["a", "b", "c", "d"]:
+        net.down(h)
     testbed.down()
