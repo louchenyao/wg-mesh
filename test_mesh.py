@@ -135,9 +135,8 @@ def test_RouteRule():
     a_rule.down()
     net.down()
 
-def test_AnyProxy(capsys):
+def test_AnyProxy():
     # somke test
-    # It is a little hard to test the any_proxy hehavior since it only improve performances in our case
     pass
     # ap = AnyProxy()
     # ap.up()
@@ -151,6 +150,12 @@ def test_AnyProxy(capsys):
     # )
     # assert(os.path.exists(log_path))
     # os.remove(log_path)
+
+def test_FreeDNS():
+    f = FreeDNS("-l 127.0.0.1:5353", global_ns)
+    f.up()
+    time.sleep(2)
+    f.down()
 
 def test_ConfSet():
     net = ConfSet()

@@ -3,6 +3,7 @@ import os
 import requests
 import subprocess
 import tempfile
+import time
 
 
 class Key(object):
@@ -242,7 +243,8 @@ class IPSetBundle(object):
 
 class AnyProxy(object):
     def up(self):
-        assert(os.system("ulimit -n 65535") == 0)
+        ulimit = subprocess.run(['sh', '-c', 'ulimit -n'], stdout=subprocess.PIPE)
+        assert(int(ulimit.stdout.strip()) >= 65535)
         bin = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
             "bin",
@@ -253,6 +255,24 @@ class AnyProxy(object):
     def down(self):
         self.p.terminate()
 
+
+class FreeDNS(object):
+    def __init__(self, args: str, ns: NS):
+        self.ns = ns
+        self.args = args
+
+    def up(self):
+        bin = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "bin",
+            "freedns-go",
+        )
+        self.p = subprocess.Popen(self.ns.gen_cmd(bin) + f" {self.args}", shell=True)
+        time.sleep(1)
+        assert(self.p.poll() == None) # is running
+    
+    def down(self):
+        self.p.terminate()
 
 # ConfSet is a set of netowrk configs
 class ConfSet(object):
