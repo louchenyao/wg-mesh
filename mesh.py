@@ -249,7 +249,7 @@ class AnyProxy(object):
     def up(self):
         # changing the ulimit needs to reboot the system under linux
         # so we just do not check it when running on CI
-        if os.environ.get('CI'):
+        if os.environ.get('CI') == None:
             ulimit = subprocess.run(['sh', '-c', 'ulimit -n'], stdout=subprocess.PIPE)
             assert(int(ulimit.stdout.strip()) >= 65535)
 

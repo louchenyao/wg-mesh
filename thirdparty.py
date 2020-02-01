@@ -44,7 +44,7 @@ def install_golang():
 
 def install_utils():
     assert(os.system("sudo apt update") == 0)
-    assert(os.system("sudo apt install -y ipset traceroute") == 0)
+    assert(os.system("sudo apt install -y ipset traceroute software-properties-common") == 0)
 
 
 def conf_sysctl():
