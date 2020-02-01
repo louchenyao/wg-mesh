@@ -1,3 +1,3 @@
-# wg-world
+# wg-mesh
 
-Tools for SELF defined network based on wiregurad.
+A mesh network configurator based on [Wireguard](https://www.wireguard.com/).
