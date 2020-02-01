@@ -1,6 +1,6 @@
 # ! /usr/bin/env python3
 
-from ww import *
+from mesh import *
 
 """ The example configuration also my personal private network configuration.
 """
