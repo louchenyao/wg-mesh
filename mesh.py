@@ -84,6 +84,7 @@ class Wg(object):
         self.name = name
         self.ns = ns
         self.addr = addr
+        self.port = port
 
         self.tmp_dir = tempfile.mkdtemp()
         sk_p = os.path.join(self.tmp_dir, "sk")

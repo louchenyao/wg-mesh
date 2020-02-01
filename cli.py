@@ -4,7 +4,7 @@ import signal
 import sys
 import time
 
-from mesh import Key
+from mesh import Key, Wg
 
 key_dir = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
@@ -66,8 +66,15 @@ def mesh_main(gen):
     if args.cmd == 'gen-client-conf':
         net = gen(tmp_key=False)
         e = net.edges[args.host]
-        assert(len(e) == 1)
+        assert(len(e) == 1) # only has one wg conf
         e = e[0]
+
+        wg = None
+        for c in net.hosts[args.host].confs.conf:
+            if type(c) == Wg:
+                wg = c
+                break
+        assert(wg != None)
 
         left = net.hosts[args.host]
         right = net.hosts[e[0]]
@@ -81,6 +88,6 @@ MTU = 1360
 [Peer]
 PublicKey = {right.key.pk}
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = {right.wan_ip}
+Endpoint = {right.wan_ip}:{wg.port}
 PersistentKeepalive = 30
 """)
