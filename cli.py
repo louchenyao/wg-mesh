@@ -24,11 +24,9 @@ class Killer(object):
         sys.exit(0)
 
 def mesh_main(gen):
-    def get_hosts():
-        tmp_net = gen(tmp_key=True)
-        return [n for n in tmp_net.hosts]
+    tmp_net = gen(tmp_key=True)
+    hosts = [n for n in tmp_net.hosts]
 
-    hosts = get_hosts()
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='cmd')
 
@@ -38,6 +36,9 @@ def mesh_main(gen):
     parser_genkey = subparsers.add_parser('genkey')
     assert('all' not in hosts) # all is a reserved host name
     parser_genkey.add_argument('host', type=str, choices=['all'] + hosts)
+
+    parser_genclientconf = subparsers.add_parser('gen-client-conf')
+    parser_genclientconf.add_argument('host', type=str, choices=hosts)
 
     args = parser.parse_args()
 
@@ -61,3 +62,25 @@ def mesh_main(gen):
                 gen_key(h)
         else:
             gen_key(args.host)
+
+    if args.cmd == 'gen-client-conf':
+        net = gen(tmp_key=False)
+        e = net.edges[args.host]
+        assert(len(e) == 1)
+        e = e[0]
+
+        left = net.hosts[args.host]
+        right = net.hosts[e[0]]
+
+        print(f"""[Interface]
+PrivateKey = {left.key.sk}
+Address = {e[1]}/30
+DNS = {e[2]}
+MTU = 1360
+
+[Peer]
+PublicKey = {right.key.pk}
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = {right.wan_ip}
+PersistentKeepalive = 30
+""")

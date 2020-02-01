@@ -357,7 +357,7 @@ class Network(object):
             right_wan_ip = right.wan_ip,
             link_cidr = cidr,
             port = port,
-            mtu = 1320,
+            mtu = 1360,
             left_ns = left.ns,
             right_ns = right.ns
         )

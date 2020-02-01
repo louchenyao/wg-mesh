@@ -17,6 +17,8 @@ def test_cli():
     assert(os.system(f"./example.py genkey all") == 0)
     assert(os.path.exists(os.path.join(key_dir, "iPhone.key")))
 
+    assert(os.system(f"./example.py gen-client-conf iPhone") == 0)
+
     # Be nice to CI machines. It will cause the CI agent to lose the connection.
     # p = subprocess.Popen(["./example.py", "up", "iPhone"])
     # time.sleep(3)
