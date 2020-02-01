@@ -242,15 +242,22 @@ class IPSetBundle(object):
         return s.strip()
 
 class AnyProxy(object):
+    def __init__(self, ns: NS):
+        self.ns = ns
+
     def up(self):
-        ulimit = subprocess.run(['sh', '-c', 'ulimit -n'], stdout=subprocess.PIPE)
-        assert(int(ulimit.stdout.strip()) >= 65535)
-        bin = os.path.join(
+        # changing the ulimit needs to reboot the system under linux
+        # so we just do not check it when running on CI
+        if os.environ.get('CI'):
+            ulimit = subprocess.run(['sh', '-c', 'ulimit -n'], stdout=subprocess.PIPE)
+            assert(int(ulimit.stdout.strip()) >= 65535)
+
+        exe = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
             "bin",
             "any_proxy",
         )
-        self.p = subprocess.Popen([bin, '-l=:3140'])
+        self.p = subprocess.Popen(self.ns.gen_cmd(exe) + " -l=:3140", shell=True)
     
     def down(self):
         self.p.terminate()
@@ -262,12 +269,12 @@ class FreeDNS(object):
         self.args = args
 
     def up(self):
-        bin = os.path.join(
+        exe = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
             "bin",
             "freedns-go",
         )
-        self.p = subprocess.Popen(self.ns.gen_cmd(bin) + f" {self.args}", shell=True)
+        self.p = subprocess.Popen(self.ns.gen_cmd(exe) + f" {self.args}", shell=True)
         time.sleep(1)
         assert(self.p.poll() == None) # is running
     
@@ -316,6 +323,7 @@ class Host(object):
         self.lan_cidrs = []
 
         self.route_table_counter = 100
+        self.nat_gateway = False
 
     # claim the cidr that is reachable from this host
     def claim_lan_cidr(self, cidr):
@@ -330,6 +338,12 @@ class Host(object):
 
     def policy_route(self, local_output: bool, nat_gateway: bool, src_ip: str, ipsetbundle: IPSetBundle, next_hop: str):
         assert(not(local_output and nat_gateway))
+
+        # start an any_proxy instances
+        if nat_gateway and not self.nat_gateway:
+            self.nat_gateway = True
+            ap = AnyProxy(self.ns)
+            self.confs.add(ap)
 
         route_table = self.route_table_counter
         self.route_table_counter += 1
@@ -350,7 +364,8 @@ class Host(object):
         elif not nat_gateway:
             self.confs.add(IPTableRule("mangle", "PREROUTING", f"{bundle_cond} {mark_0} {match_src} {target}", self.ns))
         else:
-            self.confs.add(IPTableRule("nat", "POSTROUTING", f"{bundle_cond} {mark_0} {match_src}  -j MASQUERADE", self.ns))
+            self.confs.add(IPTableRule("nat", "POSTROUTING", f"{bundle_cond} {mark_0} {match_src} ! -p tcp -j MASQUERADE", self.ns))
+            self.confs.add(IPTableRule("nat", "PREROUTING",  f"{bundle_cond} {mark_0} {match_src} -p tcp -j REDIRECT --to-ports 3140", self.ns))
 
         if not nat_gateway:
             self.confs.add(Route("default", next_hop, route_table, self.ns))

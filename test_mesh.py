@@ -206,8 +206,8 @@ def test_Network():
     testbed.up()
 
     # routing all the traffic, whose destination is hub, to `c` 
-    hub = IPSet("hub", ["192.168.0.0/16"], global_ns)
-    bundle = IPSetBundle(match=[hub], not_match=[])
+    hub_bundle = IPSet("hub", ["192.168.0.0/16"], global_ns)
+    bundle = IPSetBundle(match=[hub_bundle], not_match=[])
     net.route_ipsetbundle_to_nat_gateway(bundle, "a", "c")
 
     for h in ["a", "b", "c", "d"]:
@@ -227,6 +227,14 @@ def test_Network():
     assert(p.returncode == 0)
     print(p.stdout.decode())
     assert("10.0.0" in p.stdout.decode())
+
+    # case 3:
+    # test tcp connections
+    p = subprocess.Popen(hub.gen_cmd("python -m SimpleHTTPServer 8088"), shell=True)
+    time.sleep(0.5)
+    assert(p.poll() == None)
+    assert(os.system(a_ns.gen_cmd("timeout 2 curl 192.168.1.1:8088"))==0)
+    p.terminate()
     
     for h in ["a", "b", "c", "d"]:
         net.down(h)
