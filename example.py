@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import cmd
+import cli
 from mesh import *
 
 """ The example configuration also my personal private network configuration.
@@ -13,8 +13,8 @@ def gen_net(tmp_key):
         bj_key_path = None
         hk_key_path = None
     else:
-        bj_key_path = os.path.join(cmd.key_dir, "bj.key")
-        hk_key_path = os.path.join(cmd.key_dir, "hk.key")
+        bj_key_path = os.path.join(cli.key_dir, "bj.key")
+        hk_key_path = os.path.join(cli.key_dir, "hk.key")
 
     net.add_host(Host("bj", "39.96.60.177", Key(bj_key_path), global_ns))
     net.add_host(Host("hk", "47.91.154.79", Key(hk_key_path), global_ns))
@@ -41,7 +41,7 @@ def gen_net(tmp_key):
         if tmp_key:
             key_path = None
         else:
-            key_path = os.path.join(cmd.key_dir, f"{c}.key")
+            key_path = os.path.join(cli.key_dir, f"{c}.key")
         net.add_host(Host(c, "", Key(key_path), global_ns))
         net.connect(c, "bj", cidr, port)
     
@@ -59,4 +59,4 @@ def gen_net(tmp_key):
     return net
 
 if __name__ == "__main__":
-    cmd.mesh_main(gen_net)
+    cli.mesh_main(gen_net)
