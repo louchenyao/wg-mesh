@@ -17,7 +17,7 @@ def gen_net(tmp_key):
         hk_key_path = os.path.join(cli.key_dir, "hk.key")
 
     net.add_host(Host("bj", "39.96.60.177", Key(bj_key_path), global_ns))
-    net.add_host(Host("hk", "47.91.154.79", Key(hk_key_path), global_ns))
+    net.add_host(Host("hk", "47.244.57.178", Key(hk_key_path), global_ns))
     net.connect("bj", "hk", "10.56.1.0/30", 45677)
 
     clients_conf = [
