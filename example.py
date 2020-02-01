@@ -1,29 +1,33 @@
-# ! /usr/bin/env python3
+#! /usr/bin/env python3
 
 from mesh import *
+
+import argparse
+import signal
+import sys 
+import time
 
 """ The example configuration also my personal private network configuration.
 """
 
-def gen_net(gen_new_keys=False):
-    key_dir = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        "keys"
-    )
+key_dir = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    "keys"
+)
 
+def gen_net(tmp_key):
     net = Network()
 
-    bj_key_path = os.path.join(key_dir, "bj.key")
-    hk_key_path = os.path.join(key_dir, "hk.key")
-    if gen_new_keys:
-        bj_key = Key(None)
-        hk_key = Key(None)
-        bj_key.dump(bj_key_path)
-        hk_key.dump(hk_key_path)
+    if tmp_key:
+        bj_key_path = None
+        hk_key_path = None
+    else:
+        bj_key_path = os.path.join(key_dir, "bj.key")
+        hk_key_path = os.path.join(key_dir, "hk.key")
 
     net.add_host(Host("bj", "39.96.60.177", Key(bj_key_path), global_ns))
     net.add_host(Host("hk", "47.91.154.79", Key(hk_key_path), global_ns))
-    net.connect("bj", "hk", "10.56.1.0/30", 52333)
+    net.connect("bj", "hk", "10.56.1.0/30", 45677)
 
     clients_conf = [
         ("iPhone", "10.56.200.16/30", 45678),
@@ -43,14 +47,12 @@ def gen_net(gen_new_keys=False):
         ("wmd", "10.56.200.72/30", 45692),
     ]
     for c, cidr, port in clients_conf:
-        key_path = os.path.join(key_dir, f"{c}.key")
-        if gen_new_keys:
-            k = Key(None)
-            k.dump(key_path)
-        
+        if tmp_key:
+            key_path = None
+        else:
+            key_path = os.path.join(key_dir, f"{c}.key")
         net.add_host(Host(c, "", Key(key_path), global_ns))
         net.connect(c, "bj", cidr, port)
-         
     
     # define the non-china ipset bundle
     chinaip = IPSet("chinaip", chinaip_list(), global_ns)
@@ -63,9 +65,56 @@ def gen_net(gen_new_keys=False):
 
     return net
 
-def main():
-    net = gen_net()
-    # TODO: parse the arguments
+class Killer(object):
+    def __init__(self, net, host):
+        self.net = net
+        self.host = host
+        signal.signal(signal.SIGINT, self.kill)
+        signal.signal(signal.SIGTERM, self.kill)
+
+    def kill(self, signum, frame):
+        print("Shutting down...")
+        self.net.down(self.host)
+        sys.exit(0)
+
+def mesh_main(gen):
+    def get_hosts():
+        tmp_net = gen(tmp_key=True)
+        return [n for n in tmp_net.hosts]
+
+    hosts = get_hosts()
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='cmd')
+
+    parser_up = subparsers.add_parser('up')
+    parser_up.add_argument('host', type=str, choices=hosts)
+
+    parser_genkey = subparsers.add_parser('genkey')
+    assert('all' not in hosts) # all is a reserved host name
+    parser_genkey.add_argument('host', type=str, choices=['all'] + hosts)
+
+    args = parser.parse_args()
+
+    if args.cmd == 'up':
+        net = gen_net(tmp_key=False)
+        net.up(args.host)
+        print(f'Started as: {args.host}')
+        killer = Killer(net, args.host)
+        while True:
+            time.sleep(1)
+
+    if args.cmd == 'genkey':
+        def gen_key(h):
+            key_path = os.path.join(key_dir, f"{h}.key")
+            assert(os.path.exists(key_path) == False)
+            k = Key(None)
+            k.dump(key_path)
+
+        if args.host == 'all':
+            for h in hosts: 
+                gen_key(h)
+        else:
+            gen_key(args.host)
 
 if __name__ == "__main__":
-    main() 
+    mesh_main(gen_net)

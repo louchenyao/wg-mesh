@@ -404,7 +404,7 @@ class Network(object):
 
         
         paths = shortest_path(src, gateway)
-        print(paths)
+        #print(paths)
 
         # Add ipsets to the hosts on the path
         nodes = [paths[0][0],]
