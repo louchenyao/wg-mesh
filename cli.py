@@ -11,6 +11,13 @@ key_dir = os.path.join(
     "keys"
 )
 
+def get_key(host: str, tmp_key: bool):
+    if tmp_key:
+        return Key(None)
+    else:
+        return Key(os.path.join(key_dir, f"{host}.key"))
+
+
 class Killer(object):
     def __init__(self, net, host):
         self.net = net

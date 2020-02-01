@@ -9,15 +9,8 @@ from mesh import *
 def gen_net(tmp_key):
     net = Network()
 
-    if tmp_key:
-        bj_key_path = None
-        hk_key_path = None
-    else:
-        bj_key_path = os.path.join(cli.key_dir, "bj.key")
-        hk_key_path = os.path.join(cli.key_dir, "hk.key")
-
-    net.add_host(Host("bj", "39.96.60.177", Key(bj_key_path), global_ns))
-    net.add_host(Host("hk", "47.244.57.178", Key(hk_key_path), global_ns))
+    net.add_host(Host("bj", "39.96.60.177", cli.get_key("bj", tmp_key), global_ns))
+    net.add_host(Host("hk", "47.244.57.178", cli.get_key("hk", tmp_key), global_ns))
     net.connect("bj", "hk", "10.56.1.0/30", 45677)
 
     clients_conf = [
@@ -38,11 +31,7 @@ def gen_net(tmp_key):
         ("wmd", "10.56.200.72/30", 45692),
     ]
     for c, cidr, port in clients_conf:
-        if tmp_key:
-            key_path = None
-        else:
-            key_path = os.path.join(cli.key_dir, f"{c}.key")
-        net.add_host(Host(c, "", Key(key_path), global_ns))
+        net.add_host(Host(c, "", cli.get_key(c, tmp_key), global_ns))
         net.connect(c, "bj", cidr, port)
     
     # define the ipset bundles
@@ -55,6 +44,9 @@ def gen_net(tmp_key):
     for c, _, _ in clients_conf:
         net.route_ipsetbundle_to_nat_gateway(chinaip_bundle, c, "bj")
         net.route_ipsetbundle_to_nat_gateway(nonchinaip_bundle, c, "hk")
+
+    # freedns
+    net.hosts['bj'].confs.add(FreeDNS("-c 1.1.1.1:53", global_ns))
 
     return net
 
