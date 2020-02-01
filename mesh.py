@@ -218,7 +218,7 @@ def chinaip_list():
         return _china_ip_list_cache
 
     r = requests.get(
-        "https://raw.githubusercontent.com/17mon/china_ip_list/master/china_ip_list.txt")
+        "https://pppublic.oss-cn-beijing.aliyuncs.com/china_ip_list.txt")
     _china_ip_list_cache = r.text.split()
     return _china_ip_list_cache
 
