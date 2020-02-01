@@ -1,19 +1,10 @@
 #! /usr/bin/env python3
 
+import cmd
 from mesh import *
-
-import argparse
-import signal
-import sys 
-import time
 
 """ The example configuration also my personal private network configuration.
 """
-
-key_dir = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)),
-    "keys"
-)
 
 def gen_net(tmp_key):
     net = Network()
@@ -22,8 +13,8 @@ def gen_net(tmp_key):
         bj_key_path = None
         hk_key_path = None
     else:
-        bj_key_path = os.path.join(key_dir, "bj.key")
-        hk_key_path = os.path.join(key_dir, "hk.key")
+        bj_key_path = os.path.join(cmd.key_dir, "bj.key")
+        hk_key_path = os.path.join(cmd.key_dir, "hk.key")
 
     net.add_host(Host("bj", "39.96.60.177", Key(bj_key_path), global_ns))
     net.add_host(Host("hk", "47.91.154.79", Key(hk_key_path), global_ns))
@@ -50,71 +41,22 @@ def gen_net(tmp_key):
         if tmp_key:
             key_path = None
         else:
-            key_path = os.path.join(key_dir, f"{c}.key")
+            key_path = os.path.join(cmd.key_dir, f"{c}.key")
         net.add_host(Host(c, "", Key(key_path), global_ns))
         net.connect(c, "bj", cidr, port)
     
-    # define the non-china ipset bundle
+    # define the ipset bundles
     chinaip = IPSet("chinaip", chinaip_list(), global_ns)
     privateip = IPSet("privateip", privateip_list(), global_ns)
-    nonchinaip = IPSetBundle(match=[], not_match=[chinaip, privateip])
+    chinaip_bundle = IPSetBundle(match=[chinaip], not_match=[])
+    nonchinaip_bundle = IPSetBundle(match=[], not_match=[chinaip, privateip])
 
-    net.route_ipsetbundle_to_nat_gateway(nonchinaip, "bj", "hk")
+    net.route_ipsetbundle_to_nat_gateway(nonchinaip_bundle, "bj", "hk")
     for c, _, _ in clients_conf:
-        net.route_ipsetbundle_to_nat_gateway(nonchinaip, c, "hk")
+        net.route_ipsetbundle_to_nat_gateway(chinaip_bundle, c, "bj")
+        net.route_ipsetbundle_to_nat_gateway(nonchinaip_bundle, c, "hk")
 
     return net
 
-class Killer(object):
-    def __init__(self, net, host):
-        self.net = net
-        self.host = host
-        signal.signal(signal.SIGINT, self.kill)
-        signal.signal(signal.SIGTERM, self.kill)
-
-    def kill(self, signum, frame):
-        print("Shutting down...")
-        self.net.down(self.host)
-        sys.exit(0)
-
-def mesh_main(gen):
-    def get_hosts():
-        tmp_net = gen(tmp_key=True)
-        return [n for n in tmp_net.hosts]
-
-    hosts = get_hosts()
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest='cmd')
-
-    parser_up = subparsers.add_parser('up')
-    parser_up.add_argument('host', type=str, choices=hosts)
-
-    parser_genkey = subparsers.add_parser('genkey')
-    assert('all' not in hosts) # all is a reserved host name
-    parser_genkey.add_argument('host', type=str, choices=['all'] + hosts)
-
-    args = parser.parse_args()
-
-    if args.cmd == 'up':
-        net = gen_net(tmp_key=False)
-        net.up(args.host)
-        print(f'Started as: {args.host}')
-        killer = Killer(net, args.host)
-        while True:
-            time.sleep(1)
-
-    if args.cmd == 'genkey':
-        def gen_key(h):
-            key_path = os.path.join(key_dir, f"{h}.key")
-            assert(os.path.exists(key_path) == False)
-            k = Key(None)
-            k.dump(key_path)
-
-        if args.host == 'all':
-            for h in hosts: 
-                gen_key(h)
-        else:
-            gen_key(args.host)
-
 if __name__ == "__main__":
-    mesh_main(gen_net)
+    cmd.mesh_main(gen_net)
