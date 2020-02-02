@@ -171,71 +171,49 @@ def test_ConfSet():
 
 
 def test_Network():
-    testbed = ConfSet()
-    a_ns = NS("a")
-    b_ns = NS("b")
-    c_ns = NS("c")
-    d_ns = NS("d")
-    hub = NS("hub")
-    testbed.add([a_ns, b_ns, c_ns, d_ns, hub])
-    testbed.add([
-        Veth("atohub", "192.168.1.2/24", "192.168.1.1/24", a_ns, hub),
-        Veth("btohub", "192.168.2.2/24", "192.168.2.1/24", b_ns, hub),
-        Veth("ctohub", "192.168.3.2/24", "192.168.3.1/24", c_ns, hub),
-        Veth("dtohub", "192.168.4.2/24", "192.168.4.1/24", d_ns, hub),
-        Route("default", "192.168.1.1", "main", a_ns),
-        Route("default", "192.168.2.1", "main", b_ns),
-        Route("default", "192.168.3.1", "main", c_ns),
-        Route("default", "192.168.4.1", "main", d_ns),
-    ])
-
-    net = Network()
-    a = Host("a", "192.168.1.2", Key(None), a_ns)
-    b = Host("b", "192.168.2.2", Key(None), b_ns)
-    c = Host("c", "192.168.3.2", Key(None), c_ns)
-    d = Host("d", "192.168.4.2", Key(None), d_ns)
-    net.add_host(a)
-    net.add_host(b)
-    net.add_host(c)
-    net.add_host(d)
+    net = Network(mock_net = True)
+    net.add_host("a", "40.0.1.23", Key(None))
+    net.add_host("b", "50.0.1.23", Key(None))
+    net.add_host("c", "60.0.1.23", Key(None))
+    net.add_host("d", "70.0.1.23", Key(None))
     net.connect("a", "b", "10.0.0.0/30", 50000)
     net.connect("b", "c", "10.0.0.4/30", 50001)
     net.connect("c", "d", "10.0.0.8/30", 50002)
     net.connect("d", "a", "10.0.0.12/30", 50003)
 
-    testbed.up()
-
-    # routing all the traffic, whose destination is hub, to `c` 
-    hub_bundle = IPSet("hub", ["192.168.0.0/16"], global_ns)
-    bundle = IPSetBundle(match=[hub_bundle], not_match=[])
+    # routing all the wan traffic to `c` 
+    wan = IPSet("wan", ["40.0.1.23", "50.0.1.23", "60.0.1.23", "70.0.1.23"], global_ns)
+    pri = IPSet("pir", privateip_list(), global_ns)
+    bundle = IPSetBundle(match=[wan], not_match=[pri])
     net.route_ipsetbundle_to_nat_gateway(bundle, "a", "c")
 
+    net.up_mock_net()
     for h in ["a", "b", "c", "d"]:
         net.up(h)
 
     # case 1:
     # 10.0.0.6 is c's ip
     # if it is reachable, then it means Network() can automatically compute routes to all local ips in the network
-    assert(os.system(a_ns.gen_cmd("ping 10.0.0.6 -c 1")) == 0)
-    assert(os.system(b_ns.gen_cmd("ping 10.0.0.13 -c 1")) == 0)
-    assert(os.system(c_ns.gen_cmd("ping 10.0.0.1 -c 1")) == 0)
+    assert(os.system(NS("a").gen_cmd("ping 10.0.0.6 -c 1")) == 0)
+    assert(os.system(NS("b").gen_cmd("ping 10.0.0.13 -c 1")) == 0)
+    assert(os.system(NS("c").gen_cmd("ping 10.0.0.1 -c 1")) == 0)
 
     # case 2:
     # test if the nat works
-    assert(os.system(a_ns.gen_cmd("ping 192.168.1.1 -c 1"))==0)
-    p = subprocess.run(["sh", "-c", a_ns.gen_cmd("traceroute 192.168.1.1")], stdout=subprocess.PIPE)
+    assert(os.system(NS("a").gen_cmd("ping 70.0.1.23 -c 1"))==0)
+    p = subprocess.run(["sh", "-c", NS("a").gen_cmd("traceroute 70.0.1.23")], stdout=subprocess.PIPE)
     assert(p.returncode == 0)
     print(p.stdout.decode())
     assert("10.0.0" in p.stdout.decode())
 
     # case 3:
     # test tcp connections
-    p = subprocess.Popen(hub.gen_cmd("python -m SimpleHTTPServer 8088"), shell=True)
+    p = subprocess.Popen(NS("d").gen_cmd("python -m SimpleHTTPServer 8088"), shell=True)
     time.sleep(0.5)
     assert(p.poll() == None)
-    assert(os.system(a_ns.gen_cmd("timeout 2 curl 192.168.1.1:8088"))==0)
+    assert(os.system(NS("a").gen_cmd("timeout 2 curl 70.0.1.23:8088"))==0)
     p.terminate()
     
     for h in ["a", "b", "c", "d"]:
         net.down(h)
-    testbed.down()
+    net.down_mock_net()

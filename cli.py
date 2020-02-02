@@ -31,7 +31,7 @@ class Killer(object):
         sys.exit(0)
 
 def mesh_main(gen):
-    tmp_net = gen(tmp_key=True)
+    tmp_net = gen(tmp_key=True, mock_net=False)
     hosts = [n for n in tmp_net.hosts]
 
     parser = argparse.ArgumentParser()
@@ -50,7 +50,7 @@ def mesh_main(gen):
     args = parser.parse_args()
 
     if args.cmd == 'up':
-        net = gen(tmp_key=False)
+        net = gen(tmp_key=False, mock_net=False)
         net.up(args.host)
         print(f'Started as: {args.host}')
         killer = Killer(net, args.host)
@@ -71,7 +71,7 @@ def mesh_main(gen):
             gen_key(args.host)
 
     if args.cmd == 'gen-client-conf':
-        net = gen(tmp_key=False)
+        net = gen(tmp_key=False, mock_net=False)
         e = net.edges[args.host]
         assert(len(e) == 1) # only has one wg conf
         e = e[0]

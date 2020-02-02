@@ -268,8 +268,21 @@ class FreeDNS(object):
     def __init__(self, args: str, ns: NS):
         self.ns = ns
         self.args = args
+        self.rsolved_stopped_by_self = True
+
+    def stop_systemd_resolve(self):
+        p = subprocess.run("sudo systemctl status systemd-resolved", shell=True, stdout=subprocess.PIPE)
+        if "active (running) since" in p.stdout.decode():
+            self.resolved_stopped_by_self = True
+            assert(os.system("sudo systemctl stop systemd-resolved") == 0)
+
+    def restart_systemd_resolve(self):
+        if self.resolved_stopped_by_self:
+            os.system("sudo systemctl start systemd-resolved")
 
     def up(self):
+        self.stop_systemd_resolve()
+
         exe = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
             "bin",
@@ -280,6 +293,7 @@ class FreeDNS(object):
         assert(self.p.poll() == None) # is running
     
     def down(self):
+        self.restart_systemd_resolve()
         self.p.terminate()
 
 # ConfSet is a set of netowrk configs
@@ -373,12 +387,51 @@ class Host(object):
             self.confs.add(RouteRule(route_table, route_table, self.ns))
 
 class Network(object):
-    def __init__(self):
+    def __init__(self, mock_net: bool):
         self.hosts = {}
         self.edges = {}
         self.computed_routing_info = False
 
-    def add_host(self, host):
+        self.mock_net = mock_net
+        if mock_net:
+            self.mock_conf = ConfSet()
+            self.hub_ns = NS("hub")
+            self.mock_conf.add(self.hub_ns)
+            self.ip_allocator = 10
+
+    def add_host(self, name: str, wan_ip: str, key: Key):
+        if self.mock_net:
+            # gen left and right ip
+            if wan_ip:
+                left_addr = wan_ip + "/24"
+
+                a, b, c, d = wan_ip.split(".")
+                if d == "1":
+                    d = "2"
+                else:
+                    d = "1"
+                right_addr = f"{a}.{b}.{c}.{d}/24"
+                via = f"{a}.{b}.{c}.{d}"
+            else:
+                left_addr = f"10.123.{self.ip_allocator}.2/24"
+                right_addr = f"10.123.{self.ip_allocator}.1/24"
+                via = f"10.123.{self.ip_allocator}.1"
+                self.ip_allocator += 1
+
+            # construct ns
+            ns = NS(name)
+            self.mock_conf.add([
+                ns,
+                Veth(f"{name}", left_addr, right_addr, ns, self.hub_ns),
+                Route("default", via, "main", ns),
+                IPTableRule("filter", "FORWARD", f"-i {name}-right ! -s {left_addr} -j DROP", ns), # source validation
+            ])
+
+            # gen host
+            host = Host(name, wan_ip, key, ns)
+        else:
+            host = Host(name, wan_ip, key, global_ns)
+
         self.hosts[host.name] = host
         self.edges[host.name] = []
 
@@ -488,9 +541,21 @@ class Network(object):
         for name in self.hosts:
             compute_routeings(name)
 
+    def add_freedns(self, host):
+        h = self.hosts[host]
+        h.confs.add(FreeDNS("-c 1.1.1.1:53", h.ns))
+
     def up(self, host: str):
         self._compute_route()
         self.hosts[host].confs.up()
 
     def down(self, host: str):
         self.hosts[host].confs.down()
+
+    def up_mock_net(self):
+        assert(self.mock_net)
+        self.mock_conf.up()
+    
+    def down_mock_net(self):
+        assert(self.mock_net)
+        self.mock_conf.down()

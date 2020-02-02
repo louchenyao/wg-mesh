@@ -6,11 +6,11 @@ from mesh import *
 """ The example configuration also my personal private network configuration.
 """
 
-def gen_net(tmp_key):
-    net = Network()
+def gen_net(tmp_key: bool, mock_net: bool):
+    net = Network(mock_net)
 
-    net.add_host(Host("bj", "39.96.60.177", cli.get_key("bj", tmp_key), global_ns))
-    net.add_host(Host("hk", "47.244.57.178", cli.get_key("hk", tmp_key), global_ns))
+    net.add_host("bj", "39.96.60.177", cli.get_key("bj", tmp_key))
+    net.add_host("hk", "47.244.57.178", cli.get_key("hk", tmp_key))
     net.connect("bj", "hk", "10.56.1.0/30", 45677)
 
     clients_conf = [
@@ -31,7 +31,7 @@ def gen_net(tmp_key):
         ("wmd", "10.56.200.72/30", 45692),
     ]
     for c, cidr, port in clients_conf:
-        net.add_host(Host(c, "", cli.get_key(c, tmp_key), global_ns))
+        net.add_host(c, "", cli.get_key(c, tmp_key))
         net.connect(c, "bj", cidr, port)
     
     # define the ipset bundles
@@ -46,7 +46,7 @@ def gen_net(tmp_key):
         net.route_ipsetbundle_to_nat_gateway(nonchinaip_bundle, c, "hk")
 
     # freedns
-    net.hosts['bj'].confs.add(FreeDNS("-c 1.1.1.1:53", global_ns))
+    net.add_freedns("bj")
 
     return net
 
