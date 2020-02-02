@@ -152,7 +152,7 @@ def test_AnyProxy():
     # os.remove(log_path)
 
 def test_FreeDNS():
-    f = FreeDNS("-l 127.0.0.1:5353", global_ns)
+    f = FreeDNS("-l 127.0.0.1:5353", False, global_ns)
     f.up()
     time.sleep(2)
     f.down()

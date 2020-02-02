@@ -19,20 +19,25 @@ def get_key(host: str, tmp_key: bool):
 
 
 class Killer(object):
-    def __init__(self, net, host):
-        self.net = net
-        self.host = host
+    def __init__(self):
+        self.shutdown = False
         signal.signal(signal.SIGINT, self.kill)
         signal.signal(signal.SIGTERM, self.kill)
 
     def kill(self, signum, frame):
         print("Shutting down...")
-        self.net.down(self.host)
-        sys.exit(0)
+        self.shutdown = True
+    
+    def wait(self):
+        while not self.shutdown:
+            time.sleep(0.1)
 
 def mesh_main(gen):
     tmp_net = gen(tmp_key=True, mock_net=False)
     hosts = [n for n in tmp_net.hosts]
+    # reserved host names
+    assert('all' not in hosts)
+    assert('hub' not in hosts)
 
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='cmd')
@@ -40,8 +45,9 @@ def mesh_main(gen):
     parser_up = subparsers.add_parser('up')
     parser_up.add_argument('host', type=str, choices=hosts)
 
+    parser_mock = subparsers.add_parser('mock')
+
     parser_genkey = subparsers.add_parser('genkey')
-    assert('all' not in hosts) # all is a reserved host name
     parser_genkey.add_argument('host', type=str, choices=['all'] + hosts)
 
     parser_genclientconf = subparsers.add_parser('gen-client-conf')
@@ -53,9 +59,25 @@ def mesh_main(gen):
         net = gen(tmp_key=False, mock_net=False)
         net.up(args.host)
         print(f'Started as: {args.host}')
-        killer = Killer(net, args.host)
-        while True:
-            time.sleep(1)
+        Killer().wait()
+        net.down(args.host)
+    
+    if args.cmd == 'mock':
+        net = gen(tmp_key=False, mock_net=True)
+        print("Preparing the mock network...")
+        net.up_mock_net()
+        for h in hosts:
+            print(f"Starting {h}..")
+            net.up(h)
+        print("The mock net is up!")
+        Killer().wait()
+
+        for h in hosts:
+            print(f"Shutting down {h}...")
+            net.down(h)
+        print(f"Shutting down the mock network...")
+        net.down_mock_net()
+
 
     if args.cmd == 'genkey':
         def gen_key(h):

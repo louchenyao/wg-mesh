@@ -265,12 +265,16 @@ class AnyProxy(object):
 
 
 class FreeDNS(object):
-    def __init__(self, args: str, ns: NS):
+    def __init__(self, args: str, stop_resolved: bool, ns: NS):
         self.ns = ns
         self.args = args
-        self.rsolved_stopped_by_self = True
+        self.stop_resolved = stop_resolved
+        self.resolved_stopped_by_self = False
 
     def stop_systemd_resolve(self):
+        if not self.stop_resolved:
+            return
+
         p = subprocess.run("sudo systemctl status systemd-resolved", shell=True, stdout=subprocess.PIPE)
         if "active (running) since" in p.stdout.decode():
             self.resolved_stopped_by_self = True
@@ -396,7 +400,13 @@ class Network(object):
         if mock_net:
             self.mock_conf = ConfSet()
             self.hub_ns = NS("hub")
-            self.mock_conf.add(self.hub_ns)
+            self.mock_conf.add([
+                self.hub_ns,
+                Veth("hub", "192.168.1.1/24", "192.168.1.2/24", global_ns, self.hub_ns),
+                Route("default", "192.168.1.1", "main", self.hub_ns),
+                IPTableRule("nat", "POSTROUTING", "-o hub-right -j MASQUERADE", self.hub_ns),
+                IPTableRule("nat", "POSTROUTING", "-s 192.168.1.2 -j MASQUERADE", global_ns),
+            ])
             self.ip_allocator = 10
 
     def add_host(self, name: str, wan_ip: str, key: Key):
@@ -413,6 +423,7 @@ class Network(object):
                 right_addr = f"{a}.{b}.{c}.{d}/24"
                 via = f"{a}.{b}.{c}.{d}"
             else:
+                assert(self.ip_allocator < 255)
                 left_addr = f"10.123.{self.ip_allocator}.2/24"
                 right_addr = f"10.123.{self.ip_allocator}.1/24"
                 via = f"10.123.{self.ip_allocator}.1"
@@ -543,7 +554,7 @@ class Network(object):
 
     def add_freedns(self, host):
         h = self.hosts[host]
-        h.confs.add(FreeDNS("-c 1.1.1.1:53", h.ns))
+        h.confs.add(FreeDNS("-c 1.1.1.1:53", stop_resolved=(not self.mock_net), ns=h.ns))
 
     def up(self, host: str):
         self._compute_route()
