@@ -19,7 +19,8 @@ def test_gen_net_mock():
     assert(os.system(NS("iPhone").gen_cmd("ping 10.56.1.1 -c 1")) == 0)
     assert(os.system(NS("iPhone").gen_cmd("ping 10.56.1.2 -c 1")) == 0)
     assert(os.system(NS("iPhone").gen_cmd("ping 10.56.200.21 -c 1")) == 0)
-    assert(os.system(NS("iPhone").gen_cmd("host google.com 10.56.1.1")) == 0)
+    if os.environ.get("CI") == None:
+        assert(os.system(NS("iPhone").gen_cmd("host google.com 10.56.1.1")) == 0)
     # todo: test traceroute
 
     for h in net.hosts:
