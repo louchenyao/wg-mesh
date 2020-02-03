@@ -24,8 +24,8 @@ def test_conf_sysctl():
         value = out.split("=")[1].strip()
         assert(value == expected)
 
-    check("net.core.default_qdisc", "fq")
-    check("net.ipv4.tcp_congestion_control", "bbr")
+    # check("net.core.default_qdisc", "fq")
+    # check("net.ipv4.tcp_congestion_control", "bbr")
     check("net.ipv4.ip_forward", "1")
     check("net.ipv4.conf.all.rp_filter", "0")
     check("net.ipv4.conf.default.rp_filter", "0")
