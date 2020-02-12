@@ -520,8 +520,8 @@ class Network(object):
                     self.hosts[node].add_ipset(ipset)
 
             # setup policy routing on the hosts
-            _, _, src_ip, _ = paths[0]
-            self.hosts[src].policy_route(True, False, src_ip, ipsetbundle, next_hop)
+            _, _, src_ip, src_next_hop = paths[0]
+            self.hosts[src].policy_route(True, False, src_ip, ipsetbundle, src_next_hop)
             for i, (u, _, _, next_hop) in enumerate(paths[1:]):
                 self.hosts[u].policy_route(False, False, src_ip, ipsetbundle, next_hop)
             self.hosts[gateway].policy_route(False, True, src_ip, ipsetbundle, "")
@@ -565,7 +565,7 @@ class Network(object):
             self.computed_routing_info = True
             self._pass_1_compute_static_route()
             self._pass_2_output_to_nat_gateway()
-            
+
         self.hosts[host].confs.up()
 
     def down(self, host: str):
