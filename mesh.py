@@ -470,7 +470,7 @@ class Network(object):
         self.edges[left.name].append([right.name, lip, rip])
         self.edges[right.name].append([left.name, rip, lip])
 
-    def route_ipsetbundle_to_nat_gateway(self, ipsetbundle: IPSetBundle, src: str, gateway: str):
+    def output_to_nat_gateway(self, ipsetbundle: IPSetBundle, src: str, gateway: str):
         # uses bfs to find a shortest path 
         def shortest_path(start: str, end: str):
             vis = {name: False for name in self.hosts}

@@ -9,6 +9,7 @@ from mesh import *
 def gen_net(tmp_key: bool, mock_net: bool):
     net = Network(mock_net)
 
+    # define hosts and connections between them
     net.add_host("bj", "39.96.60.177", cli.get_key("bj", tmp_key))
     net.add_host("hk", "47.244.57.178", cli.get_key("hk", tmp_key))
     net.connect("bj", "hk", "10.56.1.0/30", 45677)
@@ -34,16 +35,17 @@ def gen_net(tmp_key: bool, mock_net: bool):
         net.add_host(c, "", cli.get_key(c, tmp_key))
         net.connect(c, "bj", cidr, port)
     
-    # define the ipset bundles
+    # define the ipset bundles used to match the destination ip later
     chinaip = IPSet("chinaip", chinaip_list(), global_ns)
     privateip = IPSet("privateip", privateip_list(), global_ns)
     chinaip_bundle = IPSetBundle(match=[chinaip], not_match=[])
     nonchinaip_bundle = IPSetBundle(match=[], not_match=[chinaip, privateip])
 
-    net.route_ipsetbundle_to_nat_gateway(nonchinaip_bundle, "bj", "hk")
+    # add policy routing rules
+    net.output_to_nat_gateway(nonchinaip_bundle, "bj", "hk")
     for c, _, _ in clients_conf:
-        net.route_ipsetbundle_to_nat_gateway(chinaip_bundle, c, "bj")
-        net.route_ipsetbundle_to_nat_gateway(nonchinaip_bundle, c, "hk")
+        net.output_to_nat_gateway(chinaip_bundle, c, "bj")
+        net.output_to_nat_gateway(nonchinaip_bundle, c, "hk")
 
     # freedns
     net.add_freedns("bj")

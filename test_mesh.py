@@ -185,7 +185,7 @@ def test_Network():
     wan = IPSet("wan", ["40.0.1.23", "50.0.1.23", "60.0.1.23", "70.0.1.23"], global_ns)
     pri = IPSet("pir", privateip_list(), global_ns)
     bundle = IPSetBundle(match=[wan], not_match=[pri])
-    net.route_ipsetbundle_to_nat_gateway(bundle, "a", "c")
+    net.output_to_nat_gateway(bundle, "a", "c")
 
     net.up_mock_net()
     for h in ["a", "b", "c", "d"]:
