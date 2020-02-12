@@ -394,6 +394,7 @@ class Network(object):
     def __init__(self, mock_net: bool):
         self.hosts = {}
         self.edges = {}
+        self.output_to_nat_list = [] # List[(ipset_bundle, src, nat_gatway)]
         self.computed_routing_info = False
 
         self.mock_net = mock_net
@@ -471,6 +472,11 @@ class Network(object):
         self.edges[right.name].append([left.name, rip, lip])
 
     def output_to_nat_gateway(self, ipsetbundle: IPSetBundle, src: str, gateway: str):
+        assert(src in self.hosts)
+        assert(gateway in self.hosts)
+        self.output_to_nat_list.append((ipsetbundle, src, gateway))
+
+    def _pass_2_output_to_nat_gateway(self):
         # uses bfs to find a shortest path 
         def shortest_path(start: str, end: str):
             vis = {name: False for name in self.hosts}
@@ -502,31 +508,29 @@ class Network(object):
             paths = paths[::-1] # reverse edges
             return paths
 
-        
-        paths = shortest_path(src, gateway)
-        #print(paths)
+        def f(ipsetbundle, src, gateway):
+            paths = shortest_path(src, gateway)
 
-        # Add ipsets to the hosts on the path
-        nodes = [paths[0][0],]
-        for e in paths:
-            nodes.append(e[1])
-        for node in nodes:
-            for ipset in ipsetbundle.match + ipsetbundle.not_match:
-                self.hosts[node].add_ipset(ipset)
+            # Add ipsets to the hosts on the path
+            nodes = [paths[0][0],]
+            for e in paths:
+                nodes.append(e[1])
+            for node in nodes:
+                for ipset in ipsetbundle.match + ipsetbundle.not_match:
+                    self.hosts[node].add_ipset(ipset)
 
-        # setup policy routing on the hosts
-        src_ip = paths[0][2] # src_ip should be the tunnel ip on the `src` node 
-        for i, (u, _, _, next_hop) in enumerate(paths):
-            local_output = i == 0
-            self.hosts[u].policy_route(local_output, False, src_ip, ipsetbundle, next_hop)
-        self.hosts[gateway].policy_route(False, True, src_ip, ipsetbundle, "")
+            # setup policy routing on the hosts
+            _, _, src_ip, _ = paths[0]
+            self.hosts[src].policy_route(True, False, src_ip, ipsetbundle, next_hop)
+            for i, (u, _, _, next_hop) in enumerate(paths[1:]):
+                self.hosts[u].policy_route(False, False, src_ip, ipsetbundle, next_hop)
+            self.hosts[gateway].policy_route(False, True, src_ip, ipsetbundle, "")
 
-    def _compute_route(self):
-        # only do this once
-        if self.computed_routing_info:
-            return
-        self.computed_routing_info = True
+        # compute paths and setup policy routings, for the rules added in `output_to_nat_gateway`
+        for ipsetbundle, src, gateway in self.output_to_nat_list:
+            f(ipsetbundle, src, gateway)
 
+    def _pass_1_compute_static_route(self):
         def compute_routeings(start):
             cidrs = self.hosts[start].lan_cidrs
             vis = {name: False for name in self.hosts}
@@ -557,7 +561,11 @@ class Network(object):
         h.confs.add(FreeDNS("-c 1.1.1.1:53", stop_resolved=(not self.mock_net), ns=h.ns))
 
     def up(self, host: str):
-        self._compute_route()
+        if not self.computed_routing_info:
+            self.computed_routing_info = True
+            self._pass_1_compute_static_route()
+            self._pass_2_output_to_nat_gateway()
+            
         self.hosts[host].confs.up()
 
     def down(self, host: str):
