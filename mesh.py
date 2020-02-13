@@ -203,7 +203,7 @@ class IPSet(object):
 
     def up(self):
         assert(self.ns != None)
-        assert(os.system(ns.gen_cmd(f"ipset create {self.name} hash:net")) == 0)
+        assert(os.system(self.ns.gen_cmd(f"ipset create {self.name} hash:net")) == 0)
         with tempfile.TemporaryDirectory() as tmp_dir:
             p = os.path.join(tmp_dir, "ipset.txt")
             with open(p, "w") as f:
@@ -211,7 +211,7 @@ class IPSet(object):
             assert(os.system(self.ns.gen_cmd(f"ipset restore < {p}")) == 0)
 
     def down(self):
-        assert(os.system(ns.gen_cmd(f"ipset destroy {self.name}")) == 0)
+        assert(os.system(self.ns.gen_cmd(f"ipset destroy {self.name}")) == 0)
 
 
 _china_ip_list_cache = []
