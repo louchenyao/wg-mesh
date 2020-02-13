@@ -189,12 +189,10 @@ class RouteRule(object):
         assert(os.system(self.ns.gen_cmd(f"ip rule del fwmark {self.mark} table {self.table}")) == 0)
 
 class IPSet(object):
-    def __init__(self, name: str, ips: list, ns: typing.Union[NS, None]):
+    def __init__(self, name: str, ips: list, ns: typing.Union[NS, None] = None):
         """
         `ns` can be `None` when defining a dummy ipset used in `Network` which will assign the proper namespace to it
         """
-        self.create = ns.gen_cmd(f"ipset create {name} hash:net")
-        self.destroy = ns.gen_cmd(f"ipset destroy {name}")
         self.name = name
         self.ns = ns
         self.ips = ips
@@ -204,8 +202,8 @@ class IPSet(object):
             self.ipset_txt += f"add {name} {ip}\n"
 
     def up(self):
-        assert(os.system(self.create) == 0)
         assert(self.ns != None)
+        assert(os.system(ns.gen_cmd(f"ipset create {self.name} hash:net")) == 0)
         with tempfile.TemporaryDirectory() as tmp_dir:
             p = os.path.join(tmp_dir, "ipset.txt")
             with open(p, "w") as f:
@@ -213,7 +211,7 @@ class IPSet(object):
             assert(os.system(self.ns.gen_cmd(f"ipset restore < {p}")) == 0)
 
     def down(self):
-        assert(os.system(self.destroy) == 0)
+        assert(os.system(ns.gen_cmd(f"ipset destroy {self.name}")) == 0)
 
 
 _china_ip_list_cache = []
