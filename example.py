@@ -36,8 +36,8 @@ def gen_net(tmp_key: bool, mock_net: bool):
         net.connect(c, "bj", cidr, port)
     
     # define the ipset bundles used to match the destination ip later
-    chinaip = IPSet("chinaip", chinaip_list(), global_ns)
-    privateip = IPSet("privateip", privateip_list(), global_ns)
+    chinaip = IPSet("chinaip", chinaip_list())
+    privateip = IPSet("privateip", privateip_list())
     chinaip_bundle = IPSetBundle(match=[chinaip], not_match=[])
     nonchinaip_bundle = IPSetBundle(match=[], not_match=[chinaip, privateip])
 
