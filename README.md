@@ -5,10 +5,10 @@ A mesh network configurator based on [Wireguard](https://www.wireguard.com/).
 ## 📚Quick Start
 
 `wg-mesh` configurator only works on Linux. Clone this project and run `thirdpary.py` to install the necessary dependencies. 
-Note that `thirdpart.py` only works on Ubuntu and other Debian-based systems, try to port it if you are running on other systems.
+Note that `thirdparty.py` only works on Ubuntu and other Debian-based systems, try to port it if you are running on other systems.
 
 ```
-python3 thirdpary.py
+python3 thirdparty.py
 ```
 
 See `example.py` for the example configuration. In `example.py`, it configures two router nodes `bj` and `hk`, and a few clients. `wg-mesh` is based on Wireguard to build the P2P tunnel. So it needs to read and manage the Wireguard credentials. At the first time, you need to generate keys for all hosts. Run the following to generate keys which will be saved to the `keys` directory:
