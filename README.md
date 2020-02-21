@@ -18,7 +18,7 @@ Debug the network configuration in the real environment is inconvenient. Thus, `
 ./exmaple.py mock
 ```
 
-You can explore it by using `sudo ip netns HOST_NAME CMD` to run commands in the mock network. For example, you can ping the `bj` host， which IP is `10.56.1.1` in the example configuration, from the `hk` host:
+You can explore it by using `sudo ip netns HOST_NAME CMD` to run commands in the mock network. For example, you can ping the `bj` host, which IP is `10.56.1.1` in the example configuration, from the `hk` host:
 
 ```
 sudo ip netns hk ping 10.56.1.1
