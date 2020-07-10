@@ -27,34 +27,27 @@ def build_freedns_go(output_path):
 
 
 def install_wireguard():
-    assert(os.system("sudo add-apt-repository -y ppa:wireguard/wireguard") == 0)
     assert(os.system("sudo apt update") == 0)
     assert(os.system("sudo apt install -y wireguard") == 0)
     assert(os.system("wg --help") == 0)
-    # ???
-    # assert(os.system("sudo modprobe wireguard"))
 
 
 def install_golang():
-    assert(os.system("sudo add-apt-repository -y ppa:longsleep/golang-backports") == 0)
     assert(os.system("sudo apt update") == 0)
     assert(os.system("sudo apt install -y golang-go") == 0)
     assert(os.system("go version") == 0)
 
-
 def install_utils():
     assert(os.system("sudo apt update") == 0)
-    assert(os.system("sudo apt install -y ipset traceroute software-properties-common") == 0)
+    assert(os.system("sudo apt install -y ipset traceroute") == 0)
 
 
 def conf_sysctl():
     with tempfile.TemporaryDirectory() as tmp_dir:
         conf_path = os.path.join(tmp_dir, "999-custom-net.conf")
         with open(conf_path, "w") as f:
-            # disable bbr in case it slows down
-            # https://bbs.archlinux.org/viewtopic.php?id=234276 
-            #f.write("net.core.default_qdisc=fq\n")
-            #f.write("net.ipv4.tcp_congestion_control=bbr\n")
+            f.write("net.core.default_qdisc=fq\n")
+            f.write("net.ipv4.tcp_congestion_control=bbr\n")
             f.write("net.ipv4.ip_forward = 1\n")
             f.write("net.ipv4.conf.all.rp_filter = 0\n")
             f.write("net.ipv4.conf.default.rp_filter = 0\n")
@@ -67,7 +60,6 @@ if __name__ == "__main__":
     install_golang()
     install_wireguard()
     conf_sysctl()
-
 
     bin_dir = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
