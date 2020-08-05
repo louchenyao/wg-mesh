@@ -264,7 +264,8 @@ class AnyProxy(object):
         self.p = subprocess.Popen(self.ns.gen_cmd(exe) + " -l=:3140", shell=True)
     
     def down(self):
-        self.p.terminate()
+        # cannot use self.p.terminate() because it's a sudo started process
+        os.system(f"sudo kill {self.p.pid}")
 
 
 class FreeDNS(object):
@@ -301,7 +302,7 @@ class FreeDNS(object):
     
     def down(self):
         self.restart_systemd_resolve()
-        self.p.terminate()
+        os.system(f"sudo kill {self.p.pid}")
 
 # ConfSet is a set of netowrk configs
 class ConfSet(object):
