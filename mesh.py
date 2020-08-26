@@ -3,6 +3,7 @@ import os
 import requests
 import subprocess
 import tempfile
+import threading
 import time
 import typing
 
@@ -248,6 +249,55 @@ class IPSetBundle(object):
 class AnyProxy(object):
     def __init__(self, ns: NS):
         self.ns = ns
+    
+    def exec_anyproxy(self):
+        exe = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "bin",
+            "any_proxy",
+        )
+        self.p = subprocess.Popen(self.ns.gen_cmd(exe) + " -l=:3140", shell=True)
+
+    def get_anyproxy_open_files(self):
+        # get session_id
+        session_id = subprocess.run(["ps", "-o",  "sid=", "-p", str(os.getpid())], stdout=subprocess.PIPE)
+        session_id = session_id.stdout.decode().strip()
+        
+        # get any_proxy pid
+        ps = subprocess.run(["ps", "-o", "pid,cmd", "-g", session_id], stdout=subprocess.PIPE)
+        pids = []
+        for l in ps.stdout.decode().splitlines():
+            #PID TT       STAT     TIME CMD
+            #776 pts/1    Ss   00:00:00 -fish
+            if "any_proxy" in l:
+                l = l.strip().split()
+                pids.append(int(l[0]))
+        
+        # get open files
+        # find the maximum one in case the pid is not the any_proxy's
+        mx = 0
+        for pid in pids:
+            wc = subprocess.run(f"sudo ls /proc/{pid}/fd | wc", shell=True, stdout=subprocess.PIPE)
+            #     72      72     222
+            wc = wc.stdout.decode().strip().split()
+            wc = int(wc[0])
+            if wc > mx:
+                mx = wc
+        return mx
+
+
+    # check if too much ports are opened
+    def check(self):
+        while True:
+            if self.stop:
+                break
+            time.sleep(3)
+            n = self.get_anyproxy_open_files()
+            if n > 8192:
+                print(f"any_proxy open {n} files! Restarting it!")
+                # restart it!
+                self.p.terminate()
+                self.exec_anyproxy()
 
     def up(self):
         # changing the ulimit needs to reboot the system under linux
@@ -256,16 +306,14 @@ class AnyProxy(object):
             ulimit = subprocess.run(['sh', '-c', 'ulimit -n'], stdout=subprocess.PIPE)
             assert(int(ulimit.stdout.strip()) >= 65535)
 
-        exe = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)),
-            "bin",
-            "any_proxy",
-        )
-        self.p = subprocess.Popen(self.ns.gen_cmd(exe) + " -l=:3140", shell=True)
+        self.exec_anyproxy()
+        self.stop = False
+        self.check_thread = threading.Thread(target=self.check)
+        self.check_thread.start()
     
     def down(self):
-        # cannot use self.p.terminate() because it's a sudo started process
-        os.system(f"sudo kill {self.p.pid}")
+        self.stop = True
+        self.p.terminate()
 
 
 class FreeDNS(object):
@@ -302,7 +350,7 @@ class FreeDNS(object):
     
     def down(self):
         self.restart_systemd_resolve()
-        os.system(f"sudo kill {self.p.pid}")
+        self.p.terminate()
 
 # ConfSet is a set of netowrk configs
 class ConfSet(object):
