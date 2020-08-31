@@ -215,18 +215,15 @@ class IPSet(object):
         assert(os.system(self.ns.gen_cmd(f"ipset destroy {self.name}")) == 0)
 
 
-_china_ip_list_cache = []
-
-
 def chinaip_list():
-    global _china_ip_list_cache
-    if len(_china_ip_list_cache) != 0:
-        return _china_ip_list_cache
+    list_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "china_ip_list.txt"
+    )
 
-    r = requests.get(
-        "https://pppublic.oss-cn-beijing.aliyuncs.com/china_ip_list.txt")
-    _china_ip_list_cache = r.text.split()
-    return _china_ip_list_cache
+    with open(list_path) as f:
+        l = f.read().split()
+        return l
 
 
 def privateip_list():
@@ -296,7 +293,7 @@ class AnyProxy(object):
             if n > 8192:
                 print(f"any_proxy open {n} files! Restarting it!")
                 # restart it!
-                self.p.terminate()
+                os.system(f"sudo kill {self.p.pid}")
                 self.exec_anyproxy()
 
     def up(self):
@@ -313,7 +310,7 @@ class AnyProxy(object):
     
     def down(self):
         self.stop = True
-        self.p.terminate()
+        os.system(f"sudo kill {self.p.pid}")
 
 
 class FreeDNS(object):
@@ -337,6 +334,7 @@ class FreeDNS(object):
             os.system("sudo systemctl start systemd-resolved")
 
     def up(self):
+        # stop systemd because it uses 53 port
         self.stop_systemd_resolve()
 
         exe = os.path.join(
@@ -350,7 +348,7 @@ class FreeDNS(object):
     
     def down(self):
         self.restart_systemd_resolve()
-        self.p.terminate()
+        os.system(f"sudo kill {self.p.pid}")
 
 # ConfSet is a set of netowrk configs
 class ConfSet(object):
@@ -608,9 +606,9 @@ class Network(object):
         for name in self.hosts:
             compute_routeings(name)
 
-    def add_freedns(self, host):
+    def add_freedns(self, host, listen="0.0.0.0:53"):
         h = self.hosts[host]
-        h.confs.add(FreeDNS("-c 1.1.1.1:53", stop_resolved=(not self.mock_net), ns=h.ns))
+        h.confs.add(FreeDNS(f"-l {listen} -c 1.1.1.1:53", stop_resolved=(not self.mock_net), ns=h.ns))
 
     def up(self, host: str):
         if not self.computed_routing_info:

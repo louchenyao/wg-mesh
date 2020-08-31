@@ -1,0 +1,10 @@
+[Unit]
+Description=Wireguard Mesh (wg-mesh)
+After=network.target
+
+[Service]
+WorkingDirectory=/home/louchenyao/pri-wg-mesh
+ExecStart=python3 ./example.py up dell-sz
+
+[Install]
+WantedBy=multi-user.target
