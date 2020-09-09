@@ -10,7 +10,7 @@ def build_any_proxy(output_path):
         exe_path = os.path.join(proj_dir, "any_proxy")
 
         os.system(
-            f"cd {tmp_dir} && git clone --depth 1 https://github.com/ryanchapman/go-any-proxy.git")
+            f"cd {tmp_dir} && git clone --depth 1 https://github.com/louchenyao/go-any-proxy.git")
         os.system(f"cd {proj_dir} && GOOS=linux GOARCH=amd64 ./make.bash")
         os.system(f"cp {exe_path} {output_path}")
 
@@ -68,4 +68,3 @@ if __name__ == "__main__":
     os.system(f"mkdir -p {bin_dir}")
     build_freedns_go(bin_dir)
     build_any_proxy(bin_dir)
-    
